@@ -3,7 +3,7 @@
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
   [rs-uri & forced]
-  ())
+  (stepdown-primary rs-uri))
 
 
 (defn simulate-maintenance
@@ -29,32 +29,39 @@
     (map stop-mongo-process stop-members)))
 
 (defn make-rs-read-only
-  "Shut down the majority of the nodes so the RS goes read only"
+  "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
   [rs-uri]
   (let [num-members   (get-num-rs-members rs-uri)
         stop-members  (get-random-members rs-uri (quot num-members 2))]
-    (map stop-mongo-process stop-members)))
+    (map stop-mongo-process stop-members)
+    stop-members))
 
 
 (defn make-shard-read-only
   "Make a single shard on a sharded cluster read only. Optionally specify RS URI for the shard to make read only"
-  [cluster-uri shard-uri]
-  ())
+  [cluster-uri & shard-uri]
+  (if (nil? shard-uri)
+    (let [shard (get-random-shards cluster-uri 1)]
+      (make-rs-read-only shard))
+    (make-rs-read-only shard-uri)))
 
 (defn make-config-servers-read-only
   "Make the config servers for a sharded cluster read only. Requires CSRS topology"
   [cluster-uri]
-  ())
+  (let [config-server-uri (get-config-servers-uri cluster-uri)]
+    (make-rs-read-only config-server-uri)))
 
 (defn make-random-shard-read-only
   "Similar to make-shard-read-only, but let the test code pick the shard"
-  [shard-uri]
-  ())
+  [cluster-uri]
+  (let [shard (get-random-shards cluster-uri 1)]
+    (make-rs-read-only shard)))
 
 (defn make-cluster-read-only
   "Shut down the majority of nodes for each replica set making up the sharded cluster. This leaves the sharded cluster read only"
   [cluster-uri]
-  ())
+  (let [shard-uris (get-shard-uris cluster-uri)]
+    (map make-shard-read-only shard-uris)))
 
 (defn cause-random-chaos
   "Trigger random problem for how-long, separated by a randomly varied interval of how-often"

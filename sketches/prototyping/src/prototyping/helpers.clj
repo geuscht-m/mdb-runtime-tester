@@ -53,3 +53,18 @@
   "Returns a list of n random replica set members from the replica set referenced by uri"
   [uri n]
   )
+
+(defn get-random-shards
+  "Returns a list of n random shards from the sharded cluster referenced by the uri"
+  [uri n]
+  )
+
+(defn get-config-servers-uri
+  "Given a sharded cluster, returns the URI needed to connect to the config servers"
+  [cluster-uri]
+  )
+
+(defn get-shard-uris
+  "Retrieve the URIs for the individual shards that make up the sharded cluster"
+  [cluster-uri]
+  )
