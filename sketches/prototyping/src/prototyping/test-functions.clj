@@ -20,22 +20,22 @@
   (let [restart-this         (get-random-members rs-uri 1)]
     (restart-mongo-process restart-this wait-interval)))
 
+(defn- partial-stop-rs
+  "Note - returns the 'undo' method needed to start the members again"
+  [rs-uri member-num]
+  (let [stop-members (get-random-members rs-uri member-num)]
+    (map stop-mongo-process stop-members)
+    `(map start-mongo-process stop-members)))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
   [rs-uri]
-  (let [num-members  (get-num-rs-members rs-uri)
-        stop-members (get-random-members rs-uri (+ (quot num-members 2) 1))]
-    (map stop-mongo-process stop-members)))
+  (partial-stop-rs rs-uri (quot (get-num-rs-members rs-uri) 2)))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
   [rs-uri]
-  (let [num-members   (get-num-rs-members rs-uri)
-        stop-members  (get-random-members rs-uri (quot num-members 2))]
-    (map stop-mongo-process stop-members)
-    stop-members))
-
+  (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
 
 (defn make-shard-read-only
   "Make a single shard on a sharded cluster read only. Optionally specify RS URI for the shard to make read only"

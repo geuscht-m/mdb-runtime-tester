@@ -26,3 +26,7 @@
   (let [primary (get-rs-primary uri)]
     (send-mongo-rs-stepdown primary)))
 
+(defn start-rs-nodes
+  "Takes a list of URIs for mongod/mongos that need to be started"
+  [uris]
+  (map start-mongo-process uris))
