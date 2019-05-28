@@ -21,11 +21,12 @@
     (restart-mongo-process restart-this wait-interval)))
 
 (defn- partial-stop-rs
-  "Note - returns the 'undo' method needed to start the members again"
+  "Internal helper function to stop _member-num_ members of a replica set.
+   Note - returns the 'undo' method needed to start the members again"
   [rs-uri member-num]
   (let [stop-members (get-random-members rs-uri member-num)]
     (map stop-mongo-process stop-members)
-    `(map start-mongo-process stop-members)))
+    (fn [] (map start-mongo-process stop-members))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
@@ -64,7 +65,13 @@
     (map make-shard-read-only shard-uris)))
 
 (defn cause-random-chaos
-  "Trigger random problem for how-long, separated by a randomly varied interval of how-often"
-  [how-long & how-often]
-  ())
+  "Trigger random problem for how-long on any of the clusters listed in cluster-list, separated by a randomly varied interval of how-often"
+  [cluster-list how-long max-wait & how-often]
+  (let [rs-function-list (trigger-election make-rs-degraded make-rs-read-only)
+        shard-function-list (make-shard-read-only make-config-servers-read-only make-random-shard-read-only make-cluster-read-only)]
+    (while (not-expired? how-long)
+      (if (is-sharded-cluster? (rand-nth cluster-list))
+        (undo-operation (rand-nth shard-function-list) (rand max-wait))
+        (undo-operation (rand-nth rs-function-list) (rand max-wait))))))
+
 

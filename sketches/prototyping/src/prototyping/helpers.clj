@@ -69,3 +69,17 @@
   [cluster-uri]
   )
 
+(defn not-expired?
+  "Check if the current time is still within the expected interval"
+  [end-time]
+  )
+
+(defn is-sharded-cluster?
+  "Check if the cluster specified by the URI is a sharded cluster or a replica set"
+  [uri]
+  )
+
+(defn undo-operation
+  "On functions that return a closure, execute the closure"
+  [returned-closure]
+  )
