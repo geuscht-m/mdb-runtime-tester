@@ -1,7 +1,10 @@
 ;; Helper functions for Mongodb discovery mechanisms
 
 (in-ns 'prototyping.core)
-(require '[clojure.string :as str])
+(require '[clojure.string :as str]
+         '[monger.core :as mg]
+         '[monger.command :as mcmd]
+         '[monger.conversion :as mcv])
 
 ;;
 ;; A bunch of mongodb driver interface helpers
@@ -19,7 +22,8 @@
 (defn- run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
   [uri]
-  )
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :replSetGetStatus 1 }) true)))
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
@@ -38,6 +42,7 @@
 (defn- run-remote-ssh-command
   [cmd]
   )
+
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
@@ -45,13 +50,15 @@
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
   (let [rs-state (run-replset-get-status uri)]
-    (first (filter #(= (get :stateStr %) "PRIMARY") (get :members rs-state)))))
+    (first (filter #(= (get % :stateStr) "PRIMARY") (get rs-state :members)))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
   (let [rs-state (run-replset-get-status uri)]
-    (filter #(= (get :stateStr %) "SECONDARY") (get :members rs-state))))
+    ;;(println rs-state)
+    ;;(println (get :members rs-state))
+    (filter #(= (get % :stateStr) "SECONDARY") (get rs-state :members))))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
