@@ -18,3 +18,11 @@
 (deftest test-rs-member-retrieval
   (testing "Make sure we get all the info about the replica set members"
     (is (= (count (get-rs-secondaries "mongodb://localhost:27017")) 2))))
+
+(deftest test-is-mongos-process
+  (testing "Check if we're running against a mongos process"
+    (is (is-mongos-process? "mongodb://localhost:27017"))))
+
+(deftest test-is-mongod-process
+  (testing "Check if we're running against a mongod process"
+    (is (is-mongod-process? "mongodb://localhost:27017"))))

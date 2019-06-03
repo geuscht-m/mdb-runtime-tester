@@ -49,15 +49,12 @@
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
-  (let [rs-state (run-replset-get-status uri)]
-    (first (filter #(= (get % :stateStr) "PRIMARY") (get rs-state :members)))))
+  (first (filter #(= (get % :stateStr) "PRIMARY") (get (run-replset-get-status uri) :members))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
   (let [rs-state (run-replset-get-status uri)]
-    ;;(println rs-state)
-    ;;(println (get :members rs-state))
     (filter #(= (get % :stateStr) "SECONDARY") (get rs-state :members))))
 
 (defn get-num-rs-members
@@ -71,10 +68,21 @@
   [uri]
   true)
 
-(defn is-mongod-process?
-  "Check if the process referenced by the URI is a mongod or mongos process"
+(defn- get-process-type
   [uri]
-  true)
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true)))
+  
+
+(defn is-mongod-process?
+  "Check if the process referenced by the URI is a mongod process"
+  [uri]
+  (= (get (get-process-type uri) :process) "mongod"))
+
+(defn is-mongos-process?
+  "Check if the process referenced by the URI is a mongos process"
+  [uri]
+  (= (get (get-process-type uri) :process) "mongos"))
 
 (defn start-local-mongo-process [uri]
   ())
