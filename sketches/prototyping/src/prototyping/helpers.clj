@@ -28,7 +28,8 @@
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
   [uri]
-  )
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :getShardMap 1 }) true)))
 
 (defn- run-replset-stepdown
   [uri]
@@ -118,7 +119,8 @@
   "Given a sharded cluster, returns the URI needed to connect to the config servers"
   [cluster-uri]
   (let [shard-map (run-get-shard-map cluster-uri)]
-    (str/split (get :config (get :map shard-map)) #",")))
+    (println shard-map)
+    (str/split (get (get shard-map :map) :config) #",")))
 
 (defn get-shard-uris
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
