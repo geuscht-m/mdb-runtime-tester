@@ -12,7 +12,8 @@
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   [uri]
-  )
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :listShards 1 }) true)))
 
 (defn- run-replset-get-config
   "Returns the output of mongodb's replSetGetConfig admin command"
@@ -127,7 +128,7 @@
    cluster-uri _must_ point to the mongos for correct discovery."
   [cluster-uri]
   (let [shard-configs (run-listshards cluster-uri)]
-    (map (get :host) (get :shards shard-configs))))
+    (map #(get % :host) (get shard-configs :shards))))
 
 (defn not-expired?
   "Check if the current time is still within the expected interval"
@@ -137,7 +138,7 @@
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
   [uri]
-  (empty? (get-shard-uris uri)))
+  (not (empty? (get-shard-uris uri))))
 
 (defn undo-operation
   "On functions that return a closure, execute the closure"

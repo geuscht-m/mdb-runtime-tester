@@ -30,3 +30,11 @@
 (deftest test-is-mongod-process
   (testing "Check if we're running against a mongod process"
     (is (is-mongod-process? "mongodb://localhost:27017"))))
+
+(deftest test-get-shard-uris
+  (testing "Try to retrieve the shard URIs"
+    (is (= (get-shard-uris "mongodb://localhost:27017") (list "shard01/localhost:27018" "shard02/localhost:27019" "shard03/localhost:27020")))))
+
+(deftest test-is-sharded
+  (testing "Are we connected to a sharded cluster"
+    (is (is-sharded-cluster? "mongodb://localhost:27017"))))
