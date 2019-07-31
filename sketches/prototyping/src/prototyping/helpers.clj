@@ -18,7 +18,8 @@
 (defn- run-replset-get-config
   "Returns the output of mongodb's replSetGetConfig admin command"
   [uri]
-  )
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :replSetGetConfig 1 }) true)))
 
 (defn- run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
@@ -33,13 +34,16 @@
     (mcv/from-db-object (mcmd/admin-command conn { :getShardMap 1 }) true)))
 
 (defn- run-replset-stepdown
+  "Runs replSetStepdown to force an election"
   [uri]
-  )
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :replSetStepdown 120 }) true)))
 
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
-  [uri & force]
-  )
+  [uri & {:keys [force] :or {force false}}]
+  (let [conn (mg/connect uri)]
+    (mcv/from-db-object (mcmd/admin-command conn { :shutdown 1 :force force }) true)))
 
 (defn- run-remote-ssh-command
   [cmd]
@@ -48,16 +52,23 @@
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
+(defn- get-rs-members-by-state
+  [uri state]
+  (let [rs-state (run-replset-get-status uri)]
+    (filter #(= (get % :stateStr) state) (get rs-state :members))))
+
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
-  (first (filter #(= (get % :stateStr) "PRIMARY") (get (run-replset-get-status uri) :members))))
+  (first (get-rs-members-by-state uri "PRIMARY")))
+;;  (first (filter #(= (get % :stateStr) "PRIMARY") (get (run-replset-get-status uri) :members))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
-  (let [rs-state (run-replset-get-status uri)]
-    (filter #(= (get % :stateStr) "SECONDARY") (get rs-state :members))))
+  (get-rs-members-by-state uri "SECONDARY"))
+  ;; (let [rs-state (run-replset-get-status uri)]
+  ;;   (filter #(= (get % :stateStr) "SECONDARY") (get rs-state :members))))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
