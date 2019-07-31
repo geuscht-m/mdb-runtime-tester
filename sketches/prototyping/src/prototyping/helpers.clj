@@ -43,6 +43,7 @@
   "Run the shutdown command on a remote or local mongod/s"
   [uri & {:keys [force] :or {force false}}]
   (let [conn (mg/connect uri)]
+    (println "Trying to shut down mongod at " uri " with forst setting " force)
     (mcv/from-db-object (mcmd/admin-command conn { :shutdown 1 :force force }) true)))
 
 (defn- run-remote-ssh-command
@@ -61,19 +62,16 @@
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
   (first (get-rs-members-by-state uri "PRIMARY")))
-;;  (first (filter #(= (get % :stateStr) "PRIMARY") (get (run-replset-get-status uri) :members))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
   (get-rs-members-by-state uri "SECONDARY"))
-  ;; (let [rs-state (run-replset-get-status uri)]
-  ;;   (filter #(= (get % :stateStr) "SECONDARY") (get rs-state :members))))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
   [uri]
-  (count (run-replset-get-status uri)))
+  (count (get (run-replset-get-status uri) :members)))
 
 
 (defn is-local-process?
@@ -104,7 +102,7 @@
   (run-remote-ssh-command uri))
 
 (defn stop-mongod-process [uri]
-  (run-shutdown-command uri))
+  (println (run-shutdown-command uri)))
 
 (defn stop-mongos-process [uri]
   (run-shutdown-command uri))
@@ -118,13 +116,13 @@
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
   [uri n]
-  (let [rs-members (get :members (run-replset-get-status uri))]
+  (let [rs-members (get (run-replset-get-status uri) :members)]
     (take n (shuffle rs-members))))
 
 (defn get-random-shards
   "Returns a list of n random shards from the sharded cluster referenced by the uri"
   [uri n]
-  (let [shards (get :shards (run-listshards uri))]
+  (let [shards (get (run-listshards uri) :shards)]
     (take n (shuffle shards))))
 
 (defn get-config-servers-uri

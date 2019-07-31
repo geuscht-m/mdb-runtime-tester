@@ -24,14 +24,18 @@
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again"
   [rs-uri member-num]
-  (let [stop-members (get-random-members rs-uri member-num)]
-    (map stop-mongo-process stop-members)
+  (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))]
+    (println "Attempting to stop mongod servers " stop-members)
+    (doall (map stop-mongo-process stop-members))
     (fn [] (map start-mongo-process stop-members))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
   [rs-uri]
-  (partial-stop-rs rs-uri (quot (get-num-rs-members rs-uri) 2)))
+  (let [num-members (get-num-rs-members rs-uri)
+        stop-rs-num (quot num-members 2)]
+    (println "Stopping n servers with n out of m servers " stop-rs-num num-members)
+    (partial-stop-rs rs-uri stop-rs-num)))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
