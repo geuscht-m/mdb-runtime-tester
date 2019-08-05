@@ -36,8 +36,12 @@
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
   [uri]
-  (let [conn (mg/connect uri)]
-    (mcv/from-db-object (mcmd/admin-command conn { :replSetStepdown 120 }) true)))
+  (let [conn (mg/connect { :uri uri })]
+    (try
+      (mcv/from-db-object (mcmd/admin-command conn { :replSetStepDown 120 }) true)
+      (catch com.mongodb.MongoSocketReadException e
+        (println "Caught expected exception " e)))))
+  
 
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"

@@ -29,3 +29,7 @@
     (println (make-rs-degraded "mongodb://localhost:27017"))
     (Thread/sleep 60000)))
 
+(deftest test-stepdown
+  (testing "Check that stepping down the primary on an RS works"
+    (println (trigger-election "mongodb://localhost:27017"))
+    (Thread/sleep 10000)))

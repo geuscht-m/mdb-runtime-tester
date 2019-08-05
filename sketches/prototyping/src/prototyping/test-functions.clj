@@ -3,6 +3,7 @@
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
   [rs-uri & forced]
+  (println "\nAttempting to trigger election in RS " rs-uri)
   (stepdown-primary rs-uri))
 
 

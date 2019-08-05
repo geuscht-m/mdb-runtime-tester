@@ -1,5 +1,4 @@
 (ns prototyping.core
-  (:require [clojure.string :refer [join] ])
   (:gen-class :main true))
 
 (defn -main
