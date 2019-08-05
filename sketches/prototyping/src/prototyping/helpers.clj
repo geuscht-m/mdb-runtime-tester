@@ -42,9 +42,18 @@
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
   [uri & {:keys [force] :or {force false}}]
-  (let [conn (mg/connect uri)]
-    (println "Trying to shut down mongod at " uri " with forst setting " force)
-    (mcv/from-db-object (mcmd/admin-command conn { :shutdown 1 :force force }) true)))
+  (let [conn (mg/connect { :uri uri })]
+    (println "\n\nTrying to shut down mongod at " uri " with force setting " force)
+    ;; NOTE: running shutdown will trigger an exception as the database
+    ;;       connection will close. Catch and discard the exception here
+    (try
+      (mcmd/admin-command conn { :shutdown 1 :force force })
+      (catch com.mongodb.MongoSocketReadException e
+        (println "Exception caught as expected"))
+      (catch java.lang.NullPointerException e
+        (println "Caught NullPointerException"))
+      (catch java.lang.RuntimeException e
+        (println "Caught RuntimeException")))))
 
 (defn- run-remote-ssh-command
   [cmd]
@@ -102,7 +111,7 @@
   (run-remote-ssh-command uri))
 
 (defn stop-mongod-process [uri]
-  (println (run-shutdown-command uri)))
+  (println (run-shutdown-command (str "mongodb://" uri))))
 
 (defn stop-mongos-process [uri]
   (run-shutdown-command uri))

@@ -25,7 +25,7 @@
    Note - returns the 'undo' method needed to start the members again"
   [rs-uri member-num]
   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))]
-    (println "Attempting to stop mongod servers " stop-members)
+    (println "\n\nAttempting to stop mongod servers " stop-members)
     (doall (map stop-mongo-process stop-members))
     (fn [] (map start-mongo-process stop-members))))
 

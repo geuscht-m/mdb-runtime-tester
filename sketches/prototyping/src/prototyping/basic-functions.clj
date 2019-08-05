@@ -11,8 +11,7 @@
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
   [uri]
   (if (is-mongod-process? uri)
-    ((println "Stopping mongod at uri " uri)
-     (stop-mongod-process uri))
+    (stop-mongod-process uri)
     (stop-mongos-process uri)))
 
 (defn restart-mongo-process
