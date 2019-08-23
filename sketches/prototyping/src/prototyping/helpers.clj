@@ -9,6 +9,13 @@
 ;;
 ;; A bunch of mongodb driver interface helpers
 ;;
+(defn- run-cmd
+  "Run a command, either on an existing connection or create a connection to run the command
+   If the type of conn-info is a String, assume URI, otherwise assume MongoClient"
+  [conn-info cmd]
+  (let [connection (if (= (type conn-info) String) (mg/connect conn-info) conn-info)]
+    (mcmd/admin-command connection cmd)))
+
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   [uri]
@@ -45,23 +52,27 @@
 
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
-  [uri & {:keys [force] :or {force false}}]
-  (let [conn (mg/connect { :uri uri })]
-    (println "\n\nTrying to shut down mongod at " uri " with force setting " force)
-    ;; NOTE: running shutdown will trigger an exception as the database
-    ;;       connection will close. Catch and discard the exception here
-    (try
-      (mcmd/admin-command conn { :shutdown 1 :force force })
-      (catch com.mongodb.MongoSocketReadException e
-        (println "Exception caught as expected"))
-      (catch java.lang.NullPointerException e
-        (println "Caught NullPointerException"))
-      (catch java.lang.RuntimeException e
-        (println "Caught RuntimeException")))))
+  [conn-info & {:keys [force] :or {force false}}]
+  (println "\n\nTrying to shut down mongod at " conn-info " with force setting " force)
+  ;; NOTE: running shutdown will trigger an exception as the database
+  ;;       connection will close. Catch and discard the exception here
+  (try
+    (run-cmd conn-info { :shutdown 1 :force force })
+    (catch com.mongodb.MongoSocketReadException e
+      (println "Exception caught as expected"))
+    (catch java.lang.NullPointerException e
+      (println "Caught NullPointerException"))
+    (catch java.lang.RuntimeException e
+      (println "Caught RuntimeException"))))
 
 (defn- run-remote-ssh-command
   [cmd]
   )
+
+(defn- run-server-get-cmd-line-opts
+  "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
+  [conn-info]
+  (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
@@ -70,6 +81,8 @@
   [uri state]
   (let [rs-state (run-replset-get-status uri)]
     (filter #(= (get % :stateStr) state) (get rs-state :members))))
+
+  
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -97,29 +110,40 @@
   (let [conn (mg/connect uri)]
     (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true)))
   
+(defn- make-mongo-uri
+  [hostinfo]
+  (str "mongodb://" hostinfo))
 
 (defn is-mongod-process?
   "Check if the process referenced by the URI is a mongod process"
-  [uri]
-  (= (get (get-process-type uri) :process) "mongod"))
+  [start-parameters]
+  (println "\n" start-parameters "\n")
+  (println "\n" (type start-parameters) "\n")
+  (println "\n" (first start-parameters) "\n")
+  (.contains (first start-parameters) "mongod"))
 
 (defn is-mongos-process?
   "Check if the process referenced by the URI is a mongos process"
   [uri]
   (= (get (get-process-type uri) :process) "mongos"))
 
-(defn start-local-mongo-process [uri]
-  ())
+(defn start-local-mongo-process [uri process-settings]
+  (println "\n\nStarting mongod with parameters " process-settings "\n\n"))
 
 (defn start-remote-mongo-process [uri]
   (run-remote-ssh-command uri))
 
-(defn stop-mongod-process [uri]
-  (println (run-shutdown-command (str "mongodb://" uri))))
+(defn stop-mongo-process-impl [uri]
+  (let [conn (mg/connect (make-mongo-uri uri))
+        cmdline (run-server-get-cmd-line-opts conn)]
+    (run-shutdown-command conn)
+    cmdline))
 
-(defn stop-mongos-process [uri]
-  (run-shutdown-command uri))
-
+;; (defn stop-mongos-process [uri]
+;;   (let [conn (mg/connect uri)
+;;         cmdline (run-server-get-cmd-line-opts conn)]
+;;     (run-shutdown-command conn)
+;;     cmdline))
 
 (defn send-mongo-rs-stepdown
   "Sends stepdown to the mongod referenced by the URI"
@@ -166,3 +190,8 @@
   "On functions that return a closure, execute the closure"
   [returned-closure]
   )
+
+(defn get-server-cmdline
+  "Retrieve the command line used to start this particular server process"
+  [server-uri]
+  (get (run-server-get-cmd-line-opts server-uri) :argv))

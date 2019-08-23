@@ -1,7 +1,8 @@
 (ns prototyping.test-basic-test-functions-replica-set
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
-            [clojure.java.shell :refer [sh]]))
+            [clojure.java.shell :refer [sh]]
+            [clojure.pprint :refer :all]))
 
 (defn- start-test-rs
   []
@@ -26,8 +27,13 @@
 
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping one of the members"
-    (println (make-rs-degraded "mongodb://localhost:27017"))
-    (Thread/sleep 60000)))
+    (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
+      (not (nil? restart-cmd))
+      (Thread/sleep 10000)
+      (println "\n\nTrying to run restart-cmd\n")
+      (pprint restart-cmd)
+      (println "\n\n")
+      (restart-cmd))))
 
 (deftest test-stepdown
   (testing "Check that stepping down the primary on an RS works"
