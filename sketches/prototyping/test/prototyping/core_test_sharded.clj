@@ -28,8 +28,13 @@
     (is (= (get-config-servers-uri "mongodb://localhost:27017") [ "configRepl/localhost:27021" ]))))
 
 (deftest test-is-mongos-process
-  (testing "Check if we're running against a mongos process"
+  (testing "Check if we're running against a mongos process - should be a yes"
     (is (is-mongos-process? "mongodb://localhost:27017"))))
+
+(deftest test-is-mongod-process
+  (testing "Check various processes to verify that they're mongods or not"
+    (is (is-mongod-process? "mongodb://localhost:27018"))
+    (not (is-mongod-process? "mongodb://localhost:27017"))))
 
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
