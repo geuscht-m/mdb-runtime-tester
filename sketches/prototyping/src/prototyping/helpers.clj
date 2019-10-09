@@ -116,11 +116,9 @@
 
 (defn is-mongod-process?
   "Check if the process referenced by the URI is a mongod process"
-  [start-parameters]
-  (println "\n" start-parameters "\n")
-  (println "\n" (type start-parameters) "\n")
-  (println "\n" (first start-parameters) "\n")
-  (.contains (first start-parameters) "mongod"))
+  [uri]
+  ;;(println "\n" uri "\n")
+  (= get (get-process-type uri) :process) "mongod")
 
 (defn is-mongos-process?
   "Check if the process referenced by the URI is a mongos process"

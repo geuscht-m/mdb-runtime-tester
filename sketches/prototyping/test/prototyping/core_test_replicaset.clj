@@ -24,7 +24,7 @@
 (use-fixtures :once wrap-rs-tests)
 
 (deftest test-is-mongos-process
-  (testing "Check if we're running against a mongos process"
+  (testing "Check if we're running against a mongos process - should fail as we're running mongod"
     (not (is-mongos-process? "mongodb://localhost:27017"))))
 
 (deftest test-is-mongod-process
