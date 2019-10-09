@@ -5,11 +5,14 @@
 
 (defn- start-test-rs
   []
-  (println (sh "/usr/bin/mlaunch" "start" "--dir" "/home/timo/tmp/mdb-test-rs")))
+  (println (System/getenv "PATH"))
+  (let [homedir (System/getenv "HOME")]
+    (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs")))))
 
 (defn- stop-test-rs
   []
-  (println (sh "/usr/bin/mlaunch" "stop" "--dir" "/home/timo/tmp/mdb-test-rs")))
+  (let [homedir (System/getenv "HOME")]
+        (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test-rs")))))
 
 (defn- wrap-rs-tests
   [f]

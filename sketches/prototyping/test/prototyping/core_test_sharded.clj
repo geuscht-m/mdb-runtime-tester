@@ -5,11 +5,13 @@
 
 (defn- start-sharded-cluster
   []
-  (println (sh "/usr/bin/mlaunch" "start" "--dir" "/home/timo/tmp/mdb-sharded-cluster")))
+  (let [homedir (System/getenv "HOME")]
+    (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
 
 (defn- stop-sharded-cluster
   []
-  (println (sh "/usr/bin/mlaunch" "stop" "--dir" "/home/timo/tmp/mdb-sharded-cluster")))
+  (let [homedir (System/getenv "HOME")]
+    (println (sh "/usr/bin/mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
 
 (defn wrap-sharded-tests [f]
   (start-sharded-cluster)
@@ -19,9 +21,6 @@
 
 (use-fixtures :once wrap-sharded-tests)
 
-;; (deftest test-rs-member-retrievla
-;;   (testing "Make sure we get all the info about the replica set members"
-;;     (is (= (count (get-rs-secondaries "mongodb://localhost:27017")) 2))))
 
 (deftest test-get-config-servers-uri
   (testing "Try to retrieve the URIs of the config servers"
