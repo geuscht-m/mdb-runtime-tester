@@ -11,7 +11,7 @@
 (defn- stop-sharded-cluster
   []
   (let [homedir (System/getenv "HOME")]
-    (println (sh "/usr/bin/mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
+    (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
 
 (defn wrap-sharded-tests [f]
   (start-sharded-cluster)

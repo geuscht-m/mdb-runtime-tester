@@ -47,7 +47,8 @@
     (try
       (mcv/from-db-object (mcmd/admin-command conn { :replSetStepDown 120 }) true)
       (catch com.mongodb.MongoSocketReadException e
-        (println "Caught expected exception " e)))))
+        ;;(println "Caught expected exception " e)))))
+        (println "Connection closed")))))
   
 
 (defn- run-shutdown-command
@@ -80,9 +81,8 @@
 (defn- get-rs-members-by-state
   [uri state]
   (let [rs-state (run-replset-get-status uri)]
+    ;;(println rs-state "\n")
     (filter #(= (get % :stateStr) state) (get rs-state :members))))
-
-  
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -144,7 +144,8 @@
 ;;     cmdline))
 
 (defn send-mongo-rs-stepdown
-  "Sends stepdown to the mongod referenced by the URI"
+  "Sends stepdown to the mongod referenced by the URI
+   Note that the call requires a reconnect"
   [uri]
   (run-replset-stepdown uri))
   

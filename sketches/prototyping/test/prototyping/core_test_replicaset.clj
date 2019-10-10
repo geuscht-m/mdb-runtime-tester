@@ -5,7 +5,7 @@
 
 (defn- start-test-rs
   []
-  (println (System/getenv "PATH"))
+  ;;(println (System/getenv "PATH"))
   (let [homedir (System/getenv "HOME")]
     (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs")))))
 
@@ -49,3 +49,9 @@
     (is (= (count (get-random-members "mongodb://localhost:27017" 1)) 1))
     (is (= (count (get-random-members "mongodb://localhost:27017" 2)) 2))
     (is (= (sort (map #(get % :name) (get-random-members "mongodb://localhost:27017" 3))) (list "localhost:27017" "localhost:27018" "localhost:27019")))))
+
+(deftest test-stepdown
+ (testing "Check that stepping down the primary on an RS works"
+   (trigger-election "mongodb://localhost:27017")
+   (Thread/sleep 10000)
+   (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) "localhost:27017"))))
