@@ -15,7 +15,7 @@
 
 (defn start-mongo-process
   [uri mongo-parameters]
-  ((println "\nAttempting to start mongod\n")
+  ((println "\nAttempting to start mongod with parameters\n" uri mongo-parameters)
    (if (is-mongod-process? mongo-parameters)
      ((println "\nNeed to start mongod process\n") (start-mongod-process uri mongo-parameters))
      ((println "\nNeed to start mongos process\n") (start-mongos-process uri mongo-parameters)))))

@@ -44,6 +44,11 @@
   (testing "Make sure we get all the info about the replica set members"
     (is (= (count (get-rs-secondaries "mongodb://localhost:27017")) 2))))
 
+(deftest test-get-rs-topology
+  (testing "Check that we retrieve the correct primary from the replset status"
+    (is (= (get (get-rs-primary "mongodb://localhost:27017") :name) "localhost:27017"))
+    (is (= (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017"))) (sort (list "localhost:27018" "localhost:27019"))))))
+
 (deftest test-get-random-members
   (testing "Try retrieving a random number of replica set members"
     (is (= (count (get-random-members "mongodb://localhost:27017" 1)) 1))

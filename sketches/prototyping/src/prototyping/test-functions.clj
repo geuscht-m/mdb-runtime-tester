@@ -27,16 +27,19 @@
   [rs-uri member-num]
   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))
         restart-info (doall (map stop-mongo-process stop-members))]
-    (fn [] (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))))
-    ;;(fn [] (println "Let's try to restart the replica set eith " restart-info))))
-;
+    (println "\nRestart info" restart-info)
+    (fn [] ((println "restart function - restart with " restart-info)
+            (println (type restart-info))
+            (if (seq? restart-info)
+              (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info)
+              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line)))))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
   [rs-uri]
   (let [num-members (get-num-rs-members rs-uri)
         stop-rs-num (quot num-members 2)]
-    (println "Stopping n servers with n out of m servers " stop-rs-num num-members)
+    (println "Stopping n servers out of m servers " stop-rs-num num-members)
     (partial-stop-rs rs-uri stop-rs-num)))
 
 (defn make-rs-read-only
