@@ -7,7 +7,8 @@
                  [com.novemberain/monger "3.5.0"]
                  [com.taoensso/timbre        "4.10.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre  "0.3.14"] ;; Attempt to send all log output through timbre
-                 [org.slf4j/jul-to-slf4j     "1.7.14"]]
+                 [org.slf4j/jul-to-slf4j     "1.7.14"]
+                 [org.clojure/tools.trace    "0.7.10"]]
  
   :main prototyping.core
   :target-path "target/%s"
