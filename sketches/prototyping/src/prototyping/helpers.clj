@@ -117,7 +117,7 @@
 (defn is-mongod-process?
   "Check if the process referenced by the URI is a mongod process"
   [uri]
-  ;;(println "\n" uri "\n")
+  (println "\nis-mongod-process " uri "\n")
   (= get (get-process-type uri) :process) "mongod")
 
 (defn is-mongos-process?

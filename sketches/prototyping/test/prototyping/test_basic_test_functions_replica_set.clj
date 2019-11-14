@@ -33,9 +33,6 @@
     (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
       (not (nil? restart-cmd))
       (Thread/sleep 10000)
-      (println "\n\nTrying to run restart-cmd\n")
-      (pprint restart-cmd)
-      (println "\n\n")
       (restart-cmd))))
 
 ;;(deftest test-stepdown
