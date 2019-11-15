@@ -16,11 +16,11 @@
 
 (defn start-mongo-process
   [uri mongo-parameters]
-  ((println "\nAttempting to start mongod with parameters\n" uri mongo-parameters)
-   (println (type mongo-parameters))
-   (if (is-mongod-process? mongo-parameters)
-     ((println "\nNeed to start mongod process\n") (start-mongod-process uri mongo-parameters))
-     ((println "\nNeed to start mongos process\n") (start-mongos-process uri mongo-parameters)))))
+  (println "\nAttempting to start mongod with parameteærs\n" uri mongo-parameters)
+  (println (type mongo-parameters))
+  (if (is-mongod-process? mongo-parameters)
+    (start-mongod-process uri mongo-parameters)
+    (start-mongos-process uri mongo-parameters)))
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
@@ -38,8 +38,7 @@
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
   [uri]
   (let [primary (get (get-rs-primary uri) :name)]
-    (println "\nStepping down primary " primary)
-    (send-mongo-rs-stepdown (str "mongodb://" primary))))
+    (send-mongo-rs-stepdown (make-mongo-uri primary))))
 
 (defn start-rs-nodes
   "Takes a list of URIs for mongod/mongos that need to be started"

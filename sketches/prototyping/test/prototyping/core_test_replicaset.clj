@@ -7,12 +7,12 @@
   []
   ;;(println (System/getenv "PATH"))
   (let [homedir (System/getenv "HOME")]
-    (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs")))))
+    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs"))))
 
 (defn- stop-test-rs
   []
   (let [homedir (System/getenv "HOME")]
-        (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test-rs")))))
+    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test-rs"))))
 
 (defn- wrap-rs-tests
   [f]
@@ -36,18 +36,17 @@
     (not (is-sharded-cluster? "mongodb://localhost:27017"))))
 
 (deftest test-get-rs-topology
-  (testing "Check that we retrieve the correct primary from the replset status"
-    (is (= (get (get-rs-primary "mongodb://localhost:27017") :name) "localhost:27017"))
-    (is (= (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017"))) (sort (list "localhost:27018" "localhost:27019"))))))
+  (testing "Check that we retrieve the correct primary and secondaries from the replset status"
+    (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
+      (not (nil? (re-matches #"mongodb://localhost:2701[7-9]" primary)))
+      (not (some #{primary} secondaries))
+      (is  (= (count secondaries) 2)))))
+
 
 (deftest test-rs-member-retrieval
   (testing "Make sure we get all the info about the replica set members"
     (is (= (count (get-rs-secondaries "mongodb://localhost:27017")) 2))))
-
-(deftest test-get-rs-topology
-  (testing "Check that we retrieve the correct primary from the replset status"
-    (is (= (get (get-rs-primary "mongodb://localhost:27017") :name) "localhost:27017"))
-    (is (= (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017"))) (sort (list "localhost:27018" "localhost:27019"))))))
 
 (deftest test-get-random-members
   (testing "Try retrieving a random number of replica set members"
@@ -56,7 +55,8 @@
     (is (= (sort (map #(get % :name) (get-random-members "mongodb://localhost:27017" 3))) (list "localhost:27017" "localhost:27018" "localhost:27019")))))
 
 (deftest test-stepdown
- (testing "Check that stepping down the primary on an RS works"
-   (trigger-election "mongodb://localhost:27017")
-   (Thread/sleep 10000)
-   (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) "localhost:27017"))))
+  (testing "Check that stepping down the primary on an RS works"
+    (let [original-primary (get (get-rs-primary "mongodb://localhost:27017") :name)]
+      (trigger-election "mongodb://localhost:27017")
+      (Thread/sleep 10000)
+      (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) original-primary)))))

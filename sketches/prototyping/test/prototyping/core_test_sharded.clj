@@ -6,7 +6,7 @@
 (defn- start-sharded-cluster
   []
   (let [homedir (System/getenv "HOME")]
-    (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
+    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-sharded-cluster"))))
 
 (defn- stop-sharded-cluster
   []

@@ -8,12 +8,12 @@
   []
   ;;(println (System/getenv "PATH"))
   (let [homedir (System/getenv "HOME")]
-    (println (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs")))))
+    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test-rs"))))
 
 (defn- stop-test-rs
   []
   (let [homedir (System/getenv "HOME")]
-        (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test-rs")))))
+    (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test-rs")))))
 
 (defn- wrap-rs-tests
   [f]
@@ -22,20 +22,15 @@
   (f)
   (stop-test-rs))
 
-(use-fixtures :each wrap-rs-tests)
-
-;; (deftest test-rs-maintenance
-;;   (testing "Check that simulated maintenance of the replica set acts as expected"
-;;     (simulate-maintenance "mongodb://localhost:27017")))
+(use-fixtures :once wrap-rs-tests)
 
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping one of the members"
     (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
       (not (nil? restart-cmd))
-      (Thread/sleep 10000)
-      (restart-cmd))))
-
-;;(deftest test-stepdown
-;;  (testing "Check that stepping down the primary on an RS works"
-;;    (println (trigger-election "mongodb://localhost:27017"))
-;;    (Thread/sleep 10000)))
+      (Thread/sleep 30000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 2))
+      (Thread/sleep 1000)
+      (restart-cmd)
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 3)))))

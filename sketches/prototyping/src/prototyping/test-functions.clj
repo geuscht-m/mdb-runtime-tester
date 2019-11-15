@@ -3,7 +3,6 @@
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
   [rs-uri & forced]
-  (println "\nAttempting to trigger election in RS " rs-uri)
   (stepdown-primary rs-uri))
 
 
@@ -80,5 +79,4 @@
       (if (is-sharded-cluster? (rand-nth cluster-list))
         (undo-operation (rand-nth shard-function-list) (rand max-wait))
         (undo-operation (rand-nth rs-function-list) (rand max-wait))))))
-
 
