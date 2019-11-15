@@ -24,13 +24,3 @@
 
 (use-fixtures :once wrap-rs-tests)
 
-(deftest test-degraded-rs
-  (testing "Check that we can successfully degrade an RS by stopping one of the members"
-    (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
-      (not (nil? restart-cmd))
-      (Thread/sleep 30000)
-      (is (= (num-active-rs-members "mongodb://localhost:27018") 2))
-      (Thread/sleep 1000)
-      (restart-cmd)
-      (Thread/sleep 5000)
-      (is (= (num-active-rs-members "mongodb://localhost:27018") 3)))))
