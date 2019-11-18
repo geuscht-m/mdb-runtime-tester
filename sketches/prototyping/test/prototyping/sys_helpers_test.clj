@@ -7,3 +7,7 @@
   (testing "Check that we can get the list of processes"
                                         ;(doall (map #(pprint %) get-process-list))))
     (pprint (get-process-list))))
+
+(deftest test-get-os-type
+  (testing "Check the result of get-os-type"
+    (println (get-os-type))))

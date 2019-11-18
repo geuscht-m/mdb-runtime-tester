@@ -29,5 +29,5 @@
   (let [os (get-os-type)]
     (cond
         (= os "Linux") (get-process-list-bsd)
-        (= os "Darwin") (get-process-list-bsd)
+        (= os "Mac OS X") (get-process-list-bsd)
         (= os "Windows") (get-process-list-windows))))
