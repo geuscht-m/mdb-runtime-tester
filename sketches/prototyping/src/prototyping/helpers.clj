@@ -79,7 +79,7 @@
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
   [conn-info & {:keys [force] :or {force false}}]
-  (println "\n\nTrying to shut down mongod at " conn-info " with force setting " force)
+  ;;(println "\n\nTrying to shut down mongod at " conn-info " with force setting " force)
   ;; NOTE: running shutdown will trigger an exception as the database
   ;;       connection will close. Catch and discard the exception here
   (try
@@ -169,8 +169,7 @@
   (.waitFor (-> (ProcessBuilder. process-parameters) .inheritIO .start)))
 
 (defn start-local-mongo-process [uri process-settings]
-  ;;(println "\n\nStarting mongod with parameters " process-settings "\n\n"))
-  (println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
+  ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
   (spawn-process process-settings))
 
 (defn start-remote-mongo-process [uri]
@@ -179,7 +178,7 @@
 (defn stop-mongo-process-impl [uri]
   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
         cmdline (run-server-get-cmd-line-opts conn)]
-    (println "\n\nStopping mongo process at " uri "\n\n")
+    ;;(println "\n\nStopping mongo process at " uri "\n\n")
     (run-shutdown-command conn)
     (mg/disconnect conn)
     cmdline))

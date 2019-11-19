@@ -9,15 +9,15 @@
 (defn start-mongod-process
   "Start a mongo process (mongod or mongos) on the system listed in the URI with the parameters given. Fails if the process is already running or cannot be started"
   [uri mongod-parameters]
-  (println "Trying to start mongod process with paramters " mongod-parameters)
+  ;;(println "Trying to start mongod process with parameters " mongod-parameters)
   (if (is-local-process? uri)
     (start-local-mongo-process uri mongod-parameters)
     (start-remote-mongo-process uri mongod-parameters)))
 
 (defn start-mongo-process
   [uri mongo-parameters]
-  (println "\nAttempting to start mongod with parameteærs\n" uri mongo-parameters)
-  (println (type mongo-parameters))
+  ;;(println "\nAttempting to start mongod with parameters\n" uri mongo-parameters)
+  ;;(println (type mongo-parameters))
   (if (is-mongod-process? mongo-parameters)
     (start-mongod-process uri mongo-parameters)
     (start-mongos-process uri mongo-parameters)))
