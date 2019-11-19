@@ -177,8 +177,9 @@
   (run-remote-ssh-command uri))
 
 (defn stop-mongo-process-impl [uri]
-  (let [conn (mg/connect (make-mongo-uri uri))
+  (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
         cmdline (run-server-get-cmd-line-opts conn)]
+    (println "\n\nStopping mongo process at " uri "\n\n")
     (run-shutdown-command conn)
     (mg/disconnect conn)
     cmdline))

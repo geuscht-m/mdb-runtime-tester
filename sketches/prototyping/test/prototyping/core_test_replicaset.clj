@@ -1,6 +1,8 @@
 (ns prototyping.core-test-replicaset
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
+            [prototyping.sys-helpers :refer :all]
+            [prototyping.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
 (defn- start-test-rs
@@ -21,7 +23,7 @@
   (f)
   (stop-test-rs))
 
-(use-fixtures :once wrap-rs-tests)
+(use-fixtures :each wrap-rs-tests)
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
@@ -65,9 +67,24 @@
   (testing "Check that we can successfully degrade an RS by stopping one of the members"
     (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
       (not (nil? restart-cmd))
+      ;; NOTE: Unfortunately this test is rather timing sensitive at the moment,
+      ;;       hence the various sleeps
       (Thread/sleep 30000)
-      (is (= (num-active-rs-members "mongodb://localhost:27018") 2))
+      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 2))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
-      (is (= (num-active-rs-members "mongodb://localhost:27018") 3)))))
+      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 3)))))
+
+(deftest test-read-only-rs
+  (testing "Check that we are able to successfully make a replica set read only
+            and restore it afterwards"
+    (let [restart-cmd (make-rs-read-only "mongodb://localhost:27017")]
+      (not (nil? restart-cmd))
+      (Thread/sleep 15000)
+      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 1))
+      (Thread/sleep 1000)
+      (restart-cmd)
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 3))
+      )))

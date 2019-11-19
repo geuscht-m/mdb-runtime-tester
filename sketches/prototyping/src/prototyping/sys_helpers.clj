@@ -10,7 +10,6 @@
   "Parse a line of 'ps ax' output"
   [ps-line]
   (let [parsed-line (re-find (re-matcher #"^(\d+)\s+(.+)" (clojure.string/triml ps-line)))]
-    (println parsed-line)
     { :pid (nth parsed-line 1) :command-line (nth parsed-line 2) }))
 
 (defn- get-process-list-windows
@@ -18,6 +17,8 @@
   )
 
 (defn- get-process-list-bsd
+  "Uses the BSD syntax version of ps to retrieve a list of running processes.
+   BSD syntax is used as it works on Mac OS and Linux (plus very likely on *BSD)."
   []
   (let [proc-list (sh "ps" "ax" "-o" "pid=" "-o" "command=")]
     (doall (map #(parse-ps-output %) (clojure.string/split-lines (get proc-list :out))))))
