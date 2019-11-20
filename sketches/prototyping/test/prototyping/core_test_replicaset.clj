@@ -88,3 +88,10 @@
       (Thread/sleep 5000)
       (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 3))
       )))
+
+(deftest test-simulate-maintenance
+  (testing "Test that the simulate-maintenance function correct does a rolling restart"
+    (let [num-mongods (num-active-rs-members "mongodb://localhost:27017")]
+      (simulate-maintenance "mongodb://localhost:27017")
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members "mongodb://localhost:27017") num-mongods)))))

@@ -30,9 +30,11 @@
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
-  [uri &wait-time]
+  [uri & wait-time]
+  ;;(println "Trying to stop mongo process on " uri)
   (let [mongo-parameters (stop-mongo-process uri)]
-    (start-mongo-process uri mongo-parameters)))
+    ;;(println "Restarting mongo process at uri " uri " with parameters " mongo-parameters)
+    (start-mongo-process (get mongo-parameters :uri) (get mongo-parameters :cmd-line))))
 
 (defn stepdown-primary
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"

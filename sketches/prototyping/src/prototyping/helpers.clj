@@ -211,7 +211,7 @@
   "Given a sharded cluster, returns the URI needed to connect to the config servers"
   [cluster-uri]
   (let [shard-map (run-get-shard-map cluster-uri)]
-    (println shard-map)
+    ;;(println shard-map)
     (str/split (get (get shard-map :map) :config) #",")))
 
 (defn get-shard-uris

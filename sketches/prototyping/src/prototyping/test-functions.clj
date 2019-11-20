@@ -9,14 +9,15 @@
 (defn simulate-maintenance
   "Simulate maintenance/rolling mongod bounce on a replica set. Fails if the RS URI doesn't point to a valid RS"
   [rs-uri]
-  (let [primary     (get-rs-primary rs-uri)
-        secondaries (get-rs-secondaries rs-uri)]
-    (map restart-mongo-process secondaries)
+  (let [primary     (get (get-rs-primary rs-uri) :name)
+        secondaries (doall (map #(get % :name) (get-rs-secondaries rs-uri)))]
+    (doall (map #(restart-mongo-process %) secondaries))
     (stepdown-primary rs-uri)
     (restart-mongo-process primary)))
 
 (defn restart-random-rs-member
-  "Restart a random member of the replica set (secondary or primary)" [rs-uri & wait-interval]
+  "Restart a random member of the replica set (secondary or primary)"
+  [rs-uri & wait-interval]
   (let [restart-this         (get-random-members rs-uri 1)]
     (restart-mongo-process restart-this wait-interval)))
 
@@ -26,7 +27,7 @@
   [rs-uri member-num]
   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))
         restart-info (doall (map stop-mongo-process stop-members))]
-    (println "\nRestart info" restart-info)
+    ;;(println "\nRestart info" restart-info)
     (fn [] (if (seq? restart-info)
              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
@@ -36,7 +37,7 @@
   [rs-uri]
   (let [num-members (get-num-rs-members rs-uri)
         stop-rs-num (quot num-members 2)]
-    (println "Stopping n servers out of m servers " stop-rs-num num-members)
+    ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
     (partial-stop-rs rs-uri stop-rs-num)))
 
 (defn make-rs-read-only
