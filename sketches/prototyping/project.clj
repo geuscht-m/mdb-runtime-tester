@@ -1,9 +1,11 @@
 (defproject prototyping "0.1.0-SNAPSHOT"
   :description "Sketches for a prototype of a mongodb runtime deployment tester"
-  :url "http://example.com/FIXME"
+  :url "https://github.com/geuscht-m/mdb-runtime-tester"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
+  :plugins [[lein-voom "0.1.0-20190525_204305-g28f604d"]]
   :dependencies [[org.clojure/clojure        "1.10.0"]
+                 ^{:voom {:repo "https://github.com/geuscht-m/monger" :branch "3.x-api-experiments" }}
                  [com.novemberain/monger     "3.5.0"]
                  [clojurewerkz/urly          "1.0.0"]
                  [com.taoensso/timbre        "4.10.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
