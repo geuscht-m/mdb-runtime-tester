@@ -11,7 +11,9 @@
                  [com.taoensso/timbre        "4.10.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre  "0.3.14"] ;; Attempt to send all log output through timbre
                  [org.slf4j/jul-to-slf4j     "1.7.14"]
-                 [org.clojure/tools.trace    "0.7.10"]]
+                 [org.clojure/tools.trace    "0.7.10"]
+                 [clj-ssh                    "0.5.14"]  ;; SSH client for remote execution
+                 [net.n01se/clojure-jna      "1.0.0"]]  ;; JNA interface to native libraries
  
   :main prototyping.core
   :target-path "target/%s"

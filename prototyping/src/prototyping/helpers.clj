@@ -6,7 +6,8 @@
          '[monger.command :as mcmd]
          '[monger.conversion :as mcv]
          '[clojure.java.shell :refer [sh]]
-         '[clojurewerkz.urly.core :as urly])
+         '[clojurewerkz.urly.core :as urly]
+         '[net.n01se.clojure-jna  :as jna])
 (import  java.lang.ProcessBuilder)
 
 ;; URI parsing helper
@@ -92,13 +93,19 @@
       (println "Caught RuntimeException"))))
 
 (defn- run-remote-ssh-command
-  [cmd]
+  "Execute a command described by cmdline on the remote server 'server'"
+  [server cmdline]
   )
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
   [conn-info]
   (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true))
+
+(defn- run-server-status
+  "Run the serverStatus command and return the result as a map"
+  [conn-info]
+  (mcv/from-db-object (run-cmd conn-info { :serverStatus 1 }) true))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
@@ -145,7 +152,9 @@
   
 (defn- make-mongo-uri
   [hostinfo]
-  (str "mongodb://" hostinfo))
+  (if (str/starts-with? hostinfo "mongodb://")
+    hostinfo
+    (str "mongodb://" hostinfo)))
 
 (defn check-process-type
   [parameters]
@@ -172,22 +181,77 @@
   ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
   (spawn-process process-settings))
 
-(defn start-remote-mongo-process [uri]
-  (run-remote-ssh-command uri))
 
-(defn stop-mongo-process-impl [uri]
-  (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
-        cmdline (run-server-get-cmd-line-opts conn)]
-    ;;(println "\n\nStopping mongo process at " uri "\n\n")
-    (run-shutdown-command conn)
+(defn- extract-server-name
+  "Extract the server name portion from a mongodb uri"
+  [uri]
+  uri)
+
+(defn start-remote-mongo-process
+  "Start a mongod/mongos on a different server.
+   Connects via SSH to start to avoid the need
+   for an agent on each server. The ssh account
+   that the code is connecting with needs to have
+   the appropriate privileges to start processes
+   on the remote server."
+   [uri cmdline]
+  (run-remote-ssh-command (extract-server-name uri) cmdline))
+
+(defn stop-mongo-process-impl
+  "Behind the scenes implementation of mongo process shutdown.
+   This is the shutdown via the MongoDB admin command. For
+   externally triggered process shutdown, see the next function."
+  ([uri]
+   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn)
+     (mg/disconnect conn)
+     cmdline))
+  ([uri force]
+   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn force)
+     (mg/disconnect conn)
+     cmdline)))
+
+(defn- kill-local-mongo-process-impl
+  "Kill the mongodb process via OS signal. There are two options:
+     - force = false/nil - use SIGTERM for orderly shutdown
+     - force = true      - use SIGKILL to simulate crash"
+  ([uri force]
+   (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+         cmd-line      (run-server-get-cmd-line-opts conn)
+         server-status (run-server-status conn)
+         pid           (get server-status :pid)]
+     (mg/disconnect conn)
+     (if force
+       (jna/invoke Integer c/kill pid 9)
+       (jna/invoke Integer c/kill pid 15))
+     cmd-line)))
+
+(defn- kill-remote-mongo-process-impl
+  "Kills a remote mongo process via OS signal. Similar functionality
+   to the function above, but executed on a remote machine and thus
+   using the 'kill' command rather than talking to the C library
+   directly"
+  [uri force]
+  (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+        cmd-line      (run-server-get-cmd-line-opts conn)
+        server-status (run-server-status conn)
+        pid           (get server-status :pid)]
     (mg/disconnect conn)
-    cmdline))
+    ;; TODO: Add ssh code to run 'kill' on a remote box
+    cmd-line))
 
-;; (defn stop-mongos-process [uri]
-;;   (let [conn (mg/connect uri)
-;;         cmdline (run-server-get-cmd-line-opts conn)]
-;;     (run-shutdown-command conn)
-;;     cmdline))
+(defn kill-mongo-process-impl
+  ([uri]
+   (if (is-local-process? uri)
+     (kill-local-mongo-process-impl uri false)
+     (kill-remote-mongo-process-impl uri false)))
+  ([uri force]
+   (if (is-local-process? uri)
+     (kill-local-mongo-process-impl uri force)
+     (kill-remote-mongo-process-impl uri force))))
 
 (defn send-mongo-rs-stepdown
   "Sends stepdown to the mongod referenced by the URI

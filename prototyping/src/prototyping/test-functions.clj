@@ -71,6 +71,16 @@
   (let [shard-uris (get-shard-uris cluster-uri)]
     (map make-shard-read-only shard-uris)))
 
+(defn trigger-initial-sync
+  "Test the impact of an initial sync on your cluster.
+   Depending on the topology and parameters, it will either
+   trigger a sync on a replica set member or on a sharded cluster,
+   trigger a sync on one or more shards"
+  [cluster-uri & all-shards]
+  (if (is-sharded-cluster? cluster-uri)
+    (force-initial-sync-sharded cluster-uri all-shards)
+    (force-initial-sync-rs cluster-uri)))
+
 (defn cause-random-chaos
   "Trigger random problem for how-long on any of the clusters listed in cluster-list, separated by a randomly varied interval of how-often"
   [cluster-list how-long max-wait & how-often]

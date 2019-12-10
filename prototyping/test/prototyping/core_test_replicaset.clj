@@ -89,6 +89,29 @@
       (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 3))
       )))
 
+(deftest test-kill-mongo-process
+  (testing "Check that we can shut down a mongo process using a signal instead of the
+            mongo command"
+    (let [cmdline (kill-mongo-process "mongodb://localhost:27017")]
+      (not (nil? cmdline))
+      (Thread/sleep 15000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 2))
+      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 3))
+      )))
+
+(deftest test-crash-mongo-process
+  (testing "Check that we can successfully 'crash' (kill -9) a mongod and restart it"
+    (let [cmdline (kill-mongo-process "mongodb://localhost:27017" true)]
+      (not (nil? cmdline))
+      (Thread/sleep 15000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 2))
+      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members "mongodb://localhost:27018") 3))
+      )))
+
 (deftest test-simulate-maintenance
   (testing "Test that the simulate-maintenance function correct does a rolling restart"
     (let [num-mongods (num-active-rs-members "mongodb://localhost:27017")]

@@ -24,9 +24,18 @@
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
-  [uri]
-  { :uri uri
-    :cmd-line (get (stop-mongo-process-impl uri) :argv) } )
+  ([uri]
+   { :uri uri :cmd-line (get (stop-mongo-process-impl uri) :argv) })
+  ([uri force]
+   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force) :argv) } ))
+
+(defn kill-mongo-process
+  "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
+   SIGTERM or SIGKILL to shut down the process rather than sending the process a shutdown command"
+  ([uri]
+   { :uri uri :cmd-line (get (kill-mongo-process-impl uri) :argv) })
+  ([uri force]
+   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force) :argv) } ))
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
@@ -46,3 +55,11 @@
   "Takes a list of URIs for mongod/mongos that need to be started"
   [uris]
   (map start-mongo-process uris))
+
+(defn force-initial-sync-sharded
+  [cluster-uri all-shards]
+  )
+
+(defn force-initial-sync-rs
+  [rs-uri]
+  )
