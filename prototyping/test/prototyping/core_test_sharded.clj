@@ -7,12 +7,12 @@
 (defn- start-sharded-cluster
   []
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-sharded-cluster"))))
+    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test/sharded"))))
 
 (defn- stop-sharded-cluster
   []
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster"))))
+    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test/sharded"))))
 
 (defn wrap-sharded-tests [f]
   (start-sharded-cluster)
@@ -20,12 +20,12 @@
   (f)
   (stop-sharded-cluster))
 
-(use-fixtures :once wrap-sharded-tests)
+(use-fixtures :each wrap-sharded-tests)
 
 
 (deftest test-get-config-servers-uri
   (testing "Try to retrieve the URIs of the config servers"
-    (is (= (get-config-servers-uri "mongodb://localhost:27017") [ "configRepl/localhost:27021" ]))))
+    (is (= (get-config-servers-uri "mongodb://localhost:27017") ["configRepl/localhost:27027" "localhost:27028" "localhost:27029"]))))
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should be a yes"
@@ -39,7 +39,9 @@
 
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
-    (is (= (get-shard-uris "mongodb://localhost:27017") (list "shard01/localhost:27018" "shard02/localhost:27019" "shard03/localhost:27020")))))
+    (println (get-shard-uris "mongodb://localhost:27017"))
+    (is (= (get-shard-uris "mongodb://localhost:27017")
+           (list "shard01/localhost:27018,localhost:27019,localhost:27020" "shard02/localhost:27021,localhost:27022,localhost:27023" "shard03/localhost:27024,localhost:27025,localhost:27026")))))
 
 (deftest test-is-sharded
   (testing "Are we connected to a sharded cluster"
