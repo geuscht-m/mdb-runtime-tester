@@ -46,18 +46,10 @@
   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
 
 (defn make-shard-read-only
-  "Make a single shard on a sharded cluster read only. Optionally specify RS URI for the shard to make read only"
-  [cluster-uri & shard-uri]
-  (if (nil? shard-uri)
-    (let [shard (get-random-shards cluster-uri 1)]
-      (make-rs-read-only shard))
-    (make-rs-read-only shard-uri)))
-
-(defn make-config-servers-read-only
-  "Make the config servers for a sharded cluster read only. Requires CSRS topology"
-  [cluster-uri]
-  (let [config-server-uri (get-config-servers-uri cluster-uri)]
-    (make-rs-read-only config-server-uri)))
+  "Make a single, defined shard on a sharded cluster read only.
+   If you want to make a random shard read only, use the function make-random-shard-read-only"
+  [cluster-uri shard-uri]
+  (make-rs-read-only shard-uri))
 
 (defn make-random-shard-read-only
   "Similar to make-shard-read-only, but let the test code pick the shard"
@@ -65,11 +57,17 @@
   (let [shard (get-random-shards cluster-uri 1)]
     (make-rs-read-only shard)))
 
-(defn make-cluster-read-only
+(defn make-config-servers-read-only
+  "Make the config servers for a sharded cluster read only. Requires CSRS topology"
+  [cluster-uri]
+  (let [config-server-uri (get-config-servers-uri cluster-uri)]
+    (make-rs-read-only config-server-uri)))
+
+(defn make-sharded-cluster-read-only
   "Shut down the majority of nodes for each replica set making up the sharded cluster. This leaves the sharded cluster read only"
   [cluster-uri]
   (let [shard-uris (get-shard-uris cluster-uri)]
-    (map make-shard-read-only shard-uris)))
+    (map make-shard-read-only "" shard-uris)))
 
 (defn trigger-initial-sync
   "Test the impact of an initial sync on your cluster.
@@ -85,7 +83,7 @@
   "Trigger random problem for how-long on any of the clusters listed in cluster-list, separated by a randomly varied interval of how-often"
   [cluster-list how-long max-wait & how-often]
   (let [rs-function-list (trigger-election make-rs-degraded make-rs-read-only)
-        shard-function-list (make-shard-read-only make-config-servers-read-only make-random-shard-read-only make-cluster-read-only)]
+        shard-function-list (make-shard-read-only make-config-servers-read-only make-random-shard-read-only make-sharded-cluster-read-only)]
     (while (not-expired? how-long)
       (if (is-sharded-cluster? (rand-nth cluster-list))
         (undo-operation (rand-nth shard-function-list) (rand max-wait))

@@ -1,6 +1,7 @@
 (ns prototyping.core-test-sharded
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
+            [prototyping.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
 (defn- start-sharded-cluster
@@ -11,7 +12,7 @@
 (defn- stop-sharded-cluster
   []
   (let [homedir (System/getenv "HOME")]
-    (println (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster")))))
+    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-sharded-cluster"))))
 
 (defn wrap-sharded-tests [f]
   (start-sharded-cluster)
@@ -28,7 +29,8 @@
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should be a yes"
-    (is (is-mongos-process? "mongodb://localhost:27017"))))
+    (is (is-mongos-process? "mongodb://localhost:27017"))
+    (not (is-mongos-process? "mongodb://localhost:27018"))))
 
 (deftest test-is-mongod-process
   (testing "Check various processes to verify that they're mongods or not"
@@ -42,3 +44,26 @@
 (deftest test-is-sharded
   (testing "Are we connected to a sharded cluster"
     (is (is-sharded-cluster? "mongodb://localhost:27017"))))
+
+(deftest test-degraded-single-shard
+  (testing "Check that we can create a degraded single shard with the minority of nodes on a single shard disabled"
+    ))
+
+(deftest test-degraded-all-shards
+  (testing "Check that we can create a sharded cluster with the minority of nodes on all shards disabled"
+    ))
+
+(deftest test-read-only-single-shard
+  (testing "Check that we turn a single shard on a cluster read only"
+    ))
+
+(deftest test-read-only-complete-cluster
+  (testing "Check that we can turn all shards in a cluster read only"
+    (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
+          shard-list (get-shard-uris "mongodb://localhost:27017")]
+      (println "\n" shard-list)
+      (is (shards-read-only? shard-list))
+      (doall restart)
+      (Thread/sleep 10000)
+      (not (shards-read-only? shard-list))
+    )))

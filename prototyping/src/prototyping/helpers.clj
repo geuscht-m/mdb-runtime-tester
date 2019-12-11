@@ -36,6 +36,7 @@
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   [uri]
+  (println "\nListshards uri" uri "\n")
   (let [conn (mg/connect (parse-mongodb-uri uri))
         shard-list (mcv/from-db-object (mcmd/admin-command conn { :listShards 1 }) true)]
     (mg/disconnect conn)
@@ -150,7 +151,7 @@
     (mg/disconnect conn)
     proc-type))
   
-(defn- make-mongo-uri
+(defn make-mongo-uri
   [hostinfo]
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
@@ -282,6 +283,7 @@
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
    cluster-uri _must_ point to the mongos for correct discovery."
   [cluster-uri]
+  (println "\nTrying to get shard uris for cluster " cluster-uri "\n")
   (let [shard-configs (run-listshards cluster-uri)]
     (map #(get % :host) (get shard-configs :shards))))
 

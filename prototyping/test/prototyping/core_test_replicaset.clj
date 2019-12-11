@@ -19,7 +19,7 @@
 (defn- wrap-rs-tests
   [f]
   (start-test-rs)
-  (Thread/sleep 15000) ;; Let the RS stablize
+  (Thread/sleep 10000) ;; Let the RS stablize
   (f)
   (stop-test-rs))
 
@@ -41,6 +41,8 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
+      (println primary)
+      (println secondaries)
       (not (nil? (re-matches #"mongodb://localhost:2701[7-9]" primary)))
       (not (some #{primary} secondaries))
       (is  (= (count secondaries) 2)))))
