@@ -27,13 +27,22 @@
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"
   [rs-uri]
-  (nil? (get-rs-primary (make-mongo-uri rs-uri))))
-  
+  (let [primary (get-rs-primary (make-mongo-uri rs-uri))
+        replset (run-replset-get-status (make-mongo-uri rs-uri))]
+    ;;(println "\nget-rs-primary returned " primary "\n")
+    ;;(println "\nget-replset-status returned " (get replset :members) "\n")
+    (nil? primary)))
+
+(defn shard-read-only?
+  "Wrapper around replica-set-read-only? - does the same, present
+   for more readable code"
+  [shard-uri]
+  (replica-set-read-only? shard-uri))
 
 (defn shards-read-only?
   "Check if all shards of a sharded cluster are read only."
   [cluster-uri]
-  (println "\nGetting shard uris for cluster uri " cluster-uri "\n")
+  ;;(println "\nGetting shard uris for cluster uri " cluster-uri "\n")
   (let [shards (if (= (type cluster-uri) String) (get-shard-uris cluster-uri) cluster-uri)]
       (println "\nShards: " shards "\n")
       (and (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards))))

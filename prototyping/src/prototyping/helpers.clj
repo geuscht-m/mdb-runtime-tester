@@ -5,20 +5,46 @@
          '[monger.core :as mg]
          '[monger.command :as mcmd]
          '[monger.conversion :as mcv]
+         '[prototyping.conv-helpers :as pcv]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[net.n01se.clojure-jna  :as jna])
-(import  java.lang.ProcessBuilder)
+(import  [java.lang ProcessBuilder]
+         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
+
+;; Generally available helper functions
+
+(defn make-mongo-uri
+  [hostinfo]
+  (if (str/starts-with? hostinfo "mongodb://")
+    hostinfo
+    (str "mongodb://" hostinfo)))
+
+(defn- connect-wrapper
+  [conn-info]
+  (let [connection-info (if (map? conn-info) (ServerAddress. (get conn-info :host) (get conn-info :port)) conn-info)
+        options         (.build (.readPreference (MongoClientOptions$Builder.) (ReadPreference/primaryPreferred)))]
+    ;;(println "\nCreating connection with primaryPreferred read pref\n\n")
+    (mg/connect connection-info options)))
+
 
 ;; URI parsing helper
 (defn- parse-mongodb-uri
   "Parses a mongodb URI and returns a map with :host, :port set
    TODO: Needs auth support"
   [uri]
-  (let [parsed-u (urly/url-like uri)]
-    (if (= (urly/protocol-of parsed-u) "mongodb")
-      { :host (urly/host-of parsed-u) :port (urly/port-of parsed-u) }
-      { :host "" :port 9999 })))
+  ;; Check if we're dealing with a list of servers first, because we'll have to split the URL in that case  
+  (if (str/includes? uri ",")
+    (let [parse-match (re-matches #"mongodb://.+/(.+)" uri)
+          hosts       (str/split (nth parse-match 1) #",")]
+      ;;(println "\nParse-match " parse-match)
+      ;;(println "\nParsing host list " hosts "\n\n")
+      (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))]
+                     (ServerAddress. (urly/host-of parsed-u) (urly/port-of parsed-u))) hosts)))
+    (let [parsed-u (urly/url-like uri)]
+      (if (= (urly/protocol-of parsed-u) "mongodb")
+        { :host (urly/host-of parsed-u) :port (urly/port-of parsed-u) }
+        { :host "" :port 9999 }))))
 
 ;;
 ;; A bunch of mongodb driver interface helpers
@@ -36,7 +62,7 @@
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   [uri]
-  (println "\nListshards uri" uri "\n")
+  ;;(println "\nListshards uri" uri "\n")
   (let [conn (mg/connect (parse-mongodb-uri uri))
         shard-list (mcv/from-db-object (mcmd/admin-command conn { :listShards 1 }) true)]
     (mg/disconnect conn)
@@ -50,13 +76,20 @@
     (mg/disconnect conn)
     replset-config))
 
-(defn- run-replset-get-status
+(defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
   [uri]
-  (let [conn           (mg/connect (parse-mongodb-uri uri))
-        replset-status (mcv/from-db-object (mcmd/admin-command conn { :replSetGetStatus 1 }) true)]
-    (mg/disconnect conn)
-    replset-status))
+  ;;(println "\nGetting replica set status for " uri "\n")
+  (let [conn-info (parse-mongodb-uri uri)]
+    ;;(println "\nConnection info " conn-info "\n")
+    (let [conn           (connect-wrapper conn-info)]
+      ;;(println "\nConnection info " conn "\n")
+      (let [replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
+      ;;(let [replset-status (mcv/from-db-object (.command (.getDB conn "admin") (mcv/to-db-object { :replSetGetStatus 1 }) (ReadPreference/primaryPreferred)) true)]
+      ;;(let [replset-status (mcv/from-db-object (mcmd/admin-command conn { :replSetGetStatus 1 }) true)]
+        ;;(println "\nReplset status direct: " replset-status "\n")
+        (mg/disconnect conn)
+        replset-status))))
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
@@ -120,6 +153,7 @@
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri]
+  ;;(println "\nTryin to get primary for replica set " uri "\n")
   (first (get-rs-members-by-state uri "PRIMARY")))
 
 (defn get-rs-secondaries
@@ -151,12 +185,6 @@
     (mg/disconnect conn)
     proc-type))
   
-(defn make-mongo-uri
-  [hostinfo]
-  (if (str/starts-with? hostinfo "mongodb://")
-    hostinfo
-    (str "mongodb://" hostinfo)))
-
 (defn check-process-type
   [parameters]
   (if (= (type parameters) String)
@@ -263,7 +291,9 @@
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
   [uri n]
+  ;;(println "\nGetting random members for replset " uri "\n")
   (let [rs-members (get (run-replset-get-status uri) :members)]
+    ;;(println "\nWorking on member list " rs-members "\n")
     (take n (shuffle rs-members))))
 
 (defn get-random-shards
@@ -283,7 +313,7 @@
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
    cluster-uri _must_ point to the mongos for correct discovery."
   [cluster-uri]
-  (println "\nTrying to get shard uris for cluster " cluster-uri "\n")
+  ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
   (let [shard-configs (run-listshards cluster-uri)]
     (map #(get % :host) (get shard-configs :shards))))
 

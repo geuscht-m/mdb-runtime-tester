@@ -39,7 +39,7 @@
 
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
-    (println (get-shard-uris "mongodb://localhost:27017"))
+    ;;(println (get-shard-uris "mongodb://localhost:27017"))
     (is (= (get-shard-uris "mongodb://localhost:27017")
            (list "shard01/localhost:27018,localhost:27019,localhost:27020" "shard02/localhost:27021,localhost:27022,localhost:27023" "shard03/localhost:27024,localhost:27025,localhost:27026")))))
 
@@ -56,14 +56,21 @@
     ))
 
 (deftest test-read-only-single-shard
-  (testing "Check that we turn a single shard on a cluster read only"
-    ))
+  (testing "Check that we turn a single (first) shard on a cluster read only"
+    (let [restart  (make-shard-read-only "" "mongodb://localhost:27018")]
+      (Thread/sleep 15000)  ;; Ensure that the replica set has enough time for an election
+      (is (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+      (restart)
+      (Thread/sleep 10000)
+      (not (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+    )))
 
 (deftest test-read-only-complete-cluster
   (testing "Check that we can turn all shards in a cluster read only"
     (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
           shard-list (get-shard-uris "mongodb://localhost:27017")]
       (println "\n" shard-list)
+      (Thread/sleep 11000)
       (is (shards-read-only? shard-list))
       (doall restart)
       (Thread/sleep 10000)

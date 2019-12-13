@@ -62,7 +62,7 @@
   (testing "Check that stepping down the primary on an RS works"
     (let [original-primary (get (get-rs-primary "mongodb://localhost:27017") :name)]
       (trigger-election "mongodb://localhost:27017")
-      (Thread/sleep 10000)
+      (Thread/sleep 11000)
       (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) original-primary)))))
 
 (deftest test-degraded-rs
@@ -83,8 +83,9 @@
             and restore it afterwards"
     (let [restart-cmd (make-rs-read-only "mongodb://localhost:27017")]
       (not (nil? restart-cmd))
-      (Thread/sleep 15000)
+      (Thread/sleep 20000)
       (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 2))
+      (is (replica-set-read-only? (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
