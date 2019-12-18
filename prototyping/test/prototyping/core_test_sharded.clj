@@ -39,7 +39,6 @@
 
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
-    ;;(println (get-shard-uris "mongodb://localhost:27017"))
     (is (= (get-shard-uris "mongodb://localhost:27017")
            (list "shard01/localhost:27018,localhost:27019,localhost:27020" "shard02/localhost:27021,localhost:27022,localhost:27023" "shard03/localhost:27024,localhost:27025,localhost:27026")))))
 
@@ -49,11 +48,26 @@
 
 (deftest test-degraded-single-shard
   (testing "Check that we can create a degraded single shard with the minority of nodes on a single shard disabled"
-    ))
+    (let [shard-uri "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"
+          restart (make-shard-degraded shard-uri)]
+      (Thread/sleep 11000)
+      (is (shard-degraded? shard-uri))
+      (restart)
+      (Thread/sleep 3000)
+      (not (shard-degraded? shard-uri))
+    )))
 
 (deftest test-degraded-all-shards
   (testing "Check that we can create a sharded cluster with the minority of nodes on all shards disabled"
-    ))
+    (let [cluster-uri "mongodb://localhost:27017"
+          ;;shard-list  (get-shard-uris cluster-uri)
+          restart     (make-sharded-cluster-degraded cluster-uri)]
+      (Thread/sleep 11000)
+      (is (cluster-degraded? cluster-uri))
+      (doall restart)
+      (Thread/sleep 3000)
+      (not (cluster-degraded? cluster-uri))
+    )))
 
 (deftest test-read-only-single-shard
   (testing "Check that we turn a single (first) shard on a cluster read only"
@@ -69,10 +83,10 @@
   (testing "Check that we can turn all shards in a cluster read only"
     (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
           shard-list (get-shard-uris "mongodb://localhost:27017")]
-      (println "\n" shard-list)
+      ;;(println "\n" shard-list)
       (Thread/sleep 11000)
       (is (shards-read-only? shard-list))
       (doall restart)
-      (Thread/sleep 10000)
+      (Thread/sleep 3000)
       (not (shards-read-only? shard-list))
     )))

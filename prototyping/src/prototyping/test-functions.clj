@@ -38,6 +38,7 @@
   (let [num-members (get-num-rs-members rs-uri)
         stop-rs-num (quot num-members 2)]
     ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
+    ;;(println "\nStopping RS members from uri " rs-uri "\n")
     (partial-stop-rs rs-uri stop-rs-num)))
 
 (defn make-rs-read-only
@@ -45,6 +46,11 @@
   [rs-uri]
   (println "\nMaking replica set read only " rs-uri "\n")
   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
+
+(defn make-shard-degraded
+  "Simulate a single degraded shard on a sharded cluster"
+  [shard-uri]
+  (make-rs-degraded shard-uri))
 
 (defn make-shard-read-only
   "Make a single, defined shard on a sharded cluster read only.
@@ -63,6 +69,12 @@
   [cluster-uri]
   (let [config-server-uri (get-config-servers-uri cluster-uri)]
     (make-rs-read-only config-server-uri)))
+
+(defn make-sharded-cluster-degraded
+  "Shut down the minority of nodes for each replica set on a sharded cluster"
+  [cluster-uri]
+  (let [shard-uris (get-shard-uris cluster-uri)]
+    (map #(make-shard-degraded (make-mongo-uri %)) shard-uris)))
 
 (defn make-sharded-cluster-read-only
   "Shut down the majority of nodes for each replica set making up the sharded cluster. This leaves the sharded cluster read only"
