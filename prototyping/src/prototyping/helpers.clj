@@ -80,16 +80,11 @@
   "Returns the result of Mongodb's replSetGetStatus admin command"
   [uri]
   ;;(println "\nGetting replica set status for " uri "\n")
-  (let [conn-info (parse-mongodb-uri uri)]
-    ;;(println "\nConnection info " conn-info "\n")
-    (let [conn           (connect-wrapper conn-info)]
-      ;;(println "\nConnection info " conn "\n")
-      (let [replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
-      ;;(let [replset-status (mcv/from-db-object (.command (.getDB conn "admin") (mcv/to-db-object { :replSetGetStatus 1 }) (ReadPreference/primaryPreferred)) true)]
-      ;;(let [replset-status (mcv/from-db-object (mcmd/admin-command conn { :replSetGetStatus 1 }) true)]
-        ;;(println "\nReplset status direct: " replset-status "\n")
-        (mg/disconnect conn)
-        replset-status))))
+  (let [conn-info      (parse-mongodb-uri uri)
+        conn           (connect-wrapper conn-info)
+        replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
+    (mg/disconnect conn)
+    replset-status))
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
