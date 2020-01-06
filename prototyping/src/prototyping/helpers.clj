@@ -8,7 +8,8 @@
          '[prototyping.conv-helpers :as pcv]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
-         '[net.n01se.clojure-jna  :as jna])
+         '[net.n01se.clojure-jna  :as jna]
+         '[clj-ssh.ssh :as ssh])
 (import  [java.lang ProcessBuilder]
          [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
 
@@ -124,7 +125,11 @@
 (defn- run-remote-ssh-command
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
-  )
+  (let [agent   (ssh/ssh-agent {})
+        session (ssh/session agent server)]
+    (ssh/with-connection session
+      (let [result (ssh/ssh session { :in cmdline })]
+        result))))
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
@@ -209,7 +214,10 @@
 (defn- extract-server-name
   "Extract the server name portion from a mongodb uri"
   [uri]
-  uri)
+  (let [parsed-u (urly/url-like uri)]
+    (if (= (urly/protocol-of parsed-u) "mongodb")
+      (urly/host-of parsed-u)
+      "")))
 
 (defn start-remote-mongo-process
   "Start a mongod/mongos on a different server.
