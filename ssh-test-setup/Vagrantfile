@@ -19,59 +19,18 @@ Vagrant.configure("2") do |config|
       #rs1.vm.synced_folder "/Users/timo/Vagrants/ops-mgr", "/home/vagrant", type: "rsync", rsync__args: ["--include=install-automation-agent.sh"]
       node.vm.provision "shell", path: "install-mongodb.sh"
       node.vm.provision "shell", inline: "yum install -y vim"
+      node.vm.provision "shell", inline: <<-SHELL
+        sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd.service
+      SHELL
+      node.vm.provision "shell", inline: "ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
       end
+      node.vm.provision "hosts", :sync_hosts => true
     end
   end
   
-#   config.vm.define :rs1 do |rs1|
-#     rs1.vm.network "private_network", ip: "192.168.31.95"
-#     rs1.vm.hostname = "rs1.mongodb.test"
-#     #rs1.vm.network "forwarded_port", guest: 27017, host: 27017
-#     #rs1.vm.synced_folder "/Users/timo/Vagrants/ops-mgr", "/home/vagrant", type: "rsync", rsync__args: ["--include=install-automation-agent.sh"]
-#     rs1.vm.provision "shell", path: "install-mongodb.sh"
-#     rs1.vm.provision "shell", inline: "yum install -y vim"
-#     rs1.vm.provider "virtualbox" do |vb|
-#       vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
-#     end
-
-# #    rs1.ssh.password = "vagrant"
-#   end
-
-#   config.vm.define :rs2 do |rs2|
-# #   rs2.vm.box = "centos/7"
-#     rs2.vm.network :private_network, ip: "192.168.31.96"
-#     rs2.vm.hostname = "rs2.mongodb.test"
-#     #rs2.vm.network "forwarded_port", guest: 27017, host: 27018
-# #    rs2.vm.provision "shell", path: "install-automation-agent.sh"
-#     #rs2.vm.synced_folder "/Users/timo/Vagrants/ops-mgr", "/home/vagrant", type: "rsync", rsync__args: ["--include=install-automation-agent.sh"]
-#     rs2.vm.provision "shell", path: "install-mongodb.sh"
-#     rs2.vm.provision "shell", inline: "sudo yum install -y vim"
-    
-#     rs2.vm.provider "virtualbox" do |vb|
-#       vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
-#     end
-
-#     #rs2.ssh.password = "vagrant"
-#   end
-
-#   config.vm.define :rs3 do |rs3|
-#     #rs3.vm.box = "centos/7"
-#     rs3.vm.network :private_network, ip: "192.168.31.97"
-#     rs3.vm.hostname = "rs3.mongodb.test"
-#     #rs3.vm.network "forwarded_port", guest: 27017, host: 27019
-#     #    rs3.vm.provision "shell", path: "install-rs-agent.sh"
-#     #rs3.vm.synced_folder ".", "/home/vagrant", type: "rsync", rsync__args: ["--include=install-automation-agent.sh"]
-#     rs3.vm.provision "shell", path: "install-mongodb.sh"
-#     rs3.vm.provision "shell", inline: "sudo yum install -y vim"
-    
-#     rs3.vm.provider "virtualbox" do |vb|
-#       vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
-#     end
-
-#     #rs3.ssh.password = "vagrant"
-#   end
 
   config.vm.define :testdriver do |tester|
     #rs3.vm.box = "centos/7"
@@ -82,5 +41,7 @@ Vagrant.configure("2") do |config|
     tester.vm.provider "virtualbox" do |vb|
       vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
     end
+    tester.vm.provision "hosts", :sync_hosts => true
+    tester.vm.provision "shell", inline: "ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
   end
 end
