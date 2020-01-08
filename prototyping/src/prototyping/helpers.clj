@@ -44,11 +44,15 @@
           hosts       (str/split (nth parse-match 1) #",")]
       ;;(println "\nParse-match " parse-match)
       ;;(println "\nParsing host list " hosts "\n\n")
-      (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))]
-                     (ServerAddress. (urly/host-of parsed-u) (urly/port-of parsed-u))) hosts)))
-    (let [parsed-u (urly/url-like uri)]
+      (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))
+                         host     (urly/host-of parsed-u)
+                         port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
+                     (ServerAddress. host port)) hosts)))
+    (let [parsed-u (urly/url-like uri)
+          host     (urly/host-of parsed-u)
+          port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
       (if (= (urly/protocol-of parsed-u) "mongodb")
-        { :host (urly/host-of parsed-u) :port (urly/port-of parsed-u) }
+        { :host host :port port }
         { :host "" :port 9999 }))))
 
 ;;
@@ -128,13 +132,17 @@
 
 (defn- build-cmd-line-string
   [cmdline]
-  cmdline)
+  ;;(println "cmdline type is " (type cmdline))
+  (if (sequential? cmdline)
+    (str/join " " cmdline)
+    cmdline))
 
 (defn- run-remote-ssh-command
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
+  (println "\nAttempting to run ssh command " cmdline "\n")
   (let [agent   (ssh/ssh-agent {})
-        session (ssh/session agent server)]
+        session (ssh/session agent server {:strict-host-key-checking :no})]
     (ssh/with-connection session
       (let [result (ssh/ssh session { :cmd (build-cmd-line-string cmdline) })]
         result))))
@@ -281,6 +289,7 @@
         pid           (get server-status :pid)]
     (mg/disconnect conn)
     ;; TODO: Add ssh code to run 'kill' on a remote box
+    (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
     cmd-line))
 
 (defn kill-mongo-process-impl
