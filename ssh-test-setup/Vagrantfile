@@ -1,0 +1,47 @@
+Vagrant.configure("2") do |config|
+#  config.vm.box = "centos/7"
+  
+  if Vagrant.has_plugin?("vagrant-cachier")
+    config.cache.scope = :box
+  end
+
+  #config.vm.provider "docker"
+  config.vm.provider "virtualbox" do |v|
+    config.vm.box = "centos/7"
+  end
+  # Create a three node RS, all with the same configuration
+  (1..3).each do |i|
+    config.vm.define "rs-#{i}" do |node|
+      node_ip = 73 + i
+      node.vm.network "private_network", ip: "192.168.31.#{node_ip}"
+      node.vm.hostname = "rs#{i}.mongodb.test"
+      #rs1.vm.network "forwarded_port", guest: 27017, host: 27017
+      #rs1.vm.synced_folder "/Users/timo/Vagrants/ops-mgr", "/home/vagrant", type: "rsync", rsync__args: ["--include=install-automation-agent.sh"]
+      node.vm.provision "shell", path: "install-mongodb.sh"
+      node.vm.provision "shell", inline: "yum install -y vim"
+      node.vm.provision "shell", inline: <<-SHELL
+        sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd.service
+      SHELL
+      node.vm.provision "shell", inline: "ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
+      node.vm.provider "virtualbox" do |vb|
+        vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
+      end
+      node.vm.provision "hosts", :sync_hosts => true
+    end
+  end
+  
+
+  config.vm.define :testdriver do |tester|
+    #rs3.vm.box = "centos/7"
+    tester.vm.network :private_network, ip: "192.168.31.98"
+    tester.vm.hostname = "testdriver.mongodb.test"
+    tester.vm.provision "shell", inline: "sudo yum install -y java-11-openjdk git emacs-nox wget"
+    tester.vm.provision "shell", path: "install-leiningen.sh"
+    tester.vm.provider "virtualbox" do |vb|
+      vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
+    end
+    tester.vm.provision "hosts", :sync_hosts => true
+    tester.vm.provision "shell", inline: "ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
+  end
+end
