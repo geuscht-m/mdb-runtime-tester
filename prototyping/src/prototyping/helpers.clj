@@ -122,13 +122,17 @@
     (catch java.lang.RuntimeException e
       (println "Caught RuntimeException"))))
 
+(defn- build-cmd-line-string
+  [cmdline]
+  cmdline)
+
 (defn- run-remote-ssh-command
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
   (let [agent   (ssh/ssh-agent {})
         session (ssh/session agent server)]
     (ssh/with-connection session
-      (let [result (ssh/ssh session { :in cmdline })]
+      (let [result (ssh/ssh session { :cmd (build-cmd-line-string cmdline) })]
         result))))
 
 (defn- run-server-get-cmd-line-opts
