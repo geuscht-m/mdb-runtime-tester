@@ -8,7 +8,8 @@
          '[prototyping.conv-helpers :as pcv]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
-         '[net.n01se.clojure-jna  :as jna])
+         '[net.n01se.clojure-jna  :as jna]
+         '[clj-ssh.ssh :as ssh])
 (import  [java.lang ProcessBuilder]
          [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
 
@@ -125,10 +126,18 @@
     (catch java.lang.RuntimeException e
       (println "Caught RuntimeException"))))
 
+(defn- build-cmd-line-string
+  [cmdline]
+  cmdline)
+
 (defn- run-remote-ssh-command
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
-  )
+  (let [agent   (ssh/ssh-agent {})
+        session (ssh/session agent server)]
+    (ssh/with-connection session
+      (let [result (ssh/ssh session { :cmd (build-cmd-line-string cmdline) })]
+        result))))
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
