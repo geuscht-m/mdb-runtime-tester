@@ -12,6 +12,10 @@
 (import  [java.lang ProcessBuilder]
          [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
 
+(defn- get-hostname
+  []
+  (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
+
 ;; Generally available helper functions
 
 (defn make-mongo-uri
@@ -171,7 +175,9 @@
 (defn is-local-process?
   "Check if the mongo process referenced by the URI is local or not"
   [uri]
-  true)
+  (let [parsed-uri (urly/url-like (make-mongo-uri uri))
+        hostname   (get-hostname)]
+    (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
 
 (defn- get-process-type
   [uri]
@@ -209,7 +215,8 @@
 (defn- extract-server-name
   "Extract the server name portion from a mongodb uri"
   [uri]
-  uri)
+  (let [parsed-uri (urly/url-like (make-mongo-uri uri))]
+    (urly/host-of parsed-uri)))
 
 (defn start-remote-mongo-process
   "Start a mongod/mongos on a different server.
