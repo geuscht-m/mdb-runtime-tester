@@ -26,9 +26,12 @@
 
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
-  [rs-uri]
-  (or (doall (map #(= (get % :stateStr) "(not reachable/healthy)")
-             (get (run-replset-get-status rs-uri) :members)))))
+  ([rs-uri]
+   (or (doall (map #(= (get % :stateStr) "(not reachable/healthy)")
+                   (get (run-replset-get-status rs-uri) :members)))))
+  ([rs-uri ^String user ^String pw]
+   (or (doall (map #(= (get % :stateStr) "(not reachable/healthy)")
+                   (get (run-replset-get-status rs-uri user pw) :members))))))
 
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"

@@ -307,6 +307,18 @@
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
      (mg/disconnect conn)
+     cmdline))
+  ([uri ^String username ^String password]
+   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn)
+     (mg/disconnect conn)
+     cmdline))
+  ([uri force ^String username ^String password]
+   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn force)
+     (mg/disconnect conn)
      cmdline)))
 
 (defn- kill-local-mongo-process-impl
@@ -329,15 +341,24 @@
    to the function above, but executed on a remote machine and thus
    using the 'kill' command rather than talking to the C library
    directly"
-  [uri force]
-  (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
-        cmd-line      (run-server-get-cmd-line-opts conn)
-        server-status (run-server-status conn)
-        pid           (get server-status :pid)]
-    (mg/disconnect conn)
-    ;; TODO: Add ssh code to run 'kill' on a remote box
-    (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
-    cmd-line))
+  ([uri force]
+   (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+         cmd-line      (run-server-get-cmd-line-opts conn)
+         server-status (run-server-status conn)
+         pid           (get server-status :pid)]
+     (mg/disconnect conn)
+     ;; TODO: Add ssh code to run 'kill' on a remote box
+     (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
+     cmd-line))
+  ([uri force ^String user ^String pw]
+   (let [conn          (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) user pw)
+         cmd-line      (run-server-get-cmd-line-opts conn)
+         server-status (run-server-status conn)
+         pid           (get server-status :pid)]
+     (mg/disconnect conn)
+     ;; TODO: Add ssh code to run 'kill' on a remote box
+     (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
+     cmd-line)))
 
 (defn kill-mongo-process-impl
   ([uri]
@@ -347,7 +368,15 @@
   ([uri force]
    (if (is-local-process? uri)
      (kill-local-mongo-process-impl uri force)
-     (kill-remote-mongo-process-impl uri force))))
+     (kill-remote-mongo-process-impl uri force)))
+  ([uri ^String user ^String pw]
+   (if (is-local-process? uri)
+     (kill-local-mongo-process-impl uri false user pw)
+     (kill-remote-mongo-process-impl uri false user pw)))
+  ([uri force ^String user ^String pw]
+   (if (is-local-process? uri)
+     (kill-local-mongo-process-impl uri force user pw)
+     (kill-remote-mongo-process-impl uri force user pw))))
 
 (defn send-mongo-rs-stepdown
   "Sends stepdown to the mongod referenced by the URI
@@ -357,32 +386,49 @@
   
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
-  [uri n]
+  ([uri n]
   ;;(println "\nGetting random members for replset " uri "\n")
   (let [rs-members (get (run-replset-get-status uri) :members)]
     ;;(println "\nWorking on member list " rs-members "\n")
     (take n (shuffle rs-members))))
+  ([uri n ^String username ^String password]
+   ;;(println "\nGetting random members for replset " uri "\n")
+   (let [rs-members (get (run-replset-get-status uri username password) :members)]
+     ;;(println "\nWorking on member list " rs-members "\n")
+     (take n (shuffle rs-members)))))
 
 (defn get-random-shards
   "Returns a list of n random shards from the sharded cluster referenced by the uri"
-  [uri n]
-  (let [shards (get (run-listshards uri) :shards)]
-    (take n (shuffle shards))))
+  ([uri n]
+   (let [shards (get (run-listshards uri) :shards)]
+     (take n (shuffle shards))))
+  ([uri n ^String username ^String password]
+   (let [shards (get (run-listshards uri username password) :shards)]
+     (take n (shuffle shards)))))
 
 (defn get-config-servers-uri
   "Given a sharded cluster, returns the URI needed to connect to the config servers"
-  [cluster-uri]
-  (let [shard-map (run-get-shard-map cluster-uri)]
-    ;;(println shard-map)
-    (str/split (get (get shard-map :map) :config) #",")))
+  ([cluster-uri]
+   (let [shard-map (run-get-shard-map cluster-uri)]
+     ;;(println shard-map)
+     (str/split (get (get shard-map :map) :config) #",")))
+  ([cluster-uri ^String username ^String password]
+   (let [shard-map (run-get-shard-map cluster-uri username password)]
+     ;;(println shard-map)
+     (str/split (get (get shard-map :map) :config) #","))))
 
 (defn get-shard-uris
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
    cluster-uri _must_ point to the mongos for correct discovery."
-  [cluster-uri]
+  ([cluster-uri]
   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
-  (let [shard-configs (run-listshards cluster-uri)]
-    (map #(get % :host) (get shard-configs :shards))))
+   (let [shard-configs (run-listshards cluster-uri)]
+     (map #(get % :host) (get shard-configs :shards))))
+  ([cluster-uri ^String username ^String password]
+   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
+   (let [shard-configs (run-listshards cluster-uri username password)]
+     (map #(get % :host) (get shard-configs :shards)))))
+
 
 (defn not-expired?
   "Check if the current time is still within the expected interval"
@@ -397,9 +443,11 @@
 (defn undo-operation
   "On functions that return a closure, execute the closure"
   [returned-closure]
-  )
+  (returned-closure))
 
 (defn get-server-cmdline
   "Retrieve the command line used to start this particular server process"
-  [server-uri]
-  (get (run-server-get-cmd-line-opts server-uri) :argv))
+  ([server-uri]
+   (get (run-server-get-cmd-line-opts server-uri) :argv))
+  ([server-uri ^String user ^String password]
+   (get (run-server-get-cmd-line-opts server-uri user password) :argv)))

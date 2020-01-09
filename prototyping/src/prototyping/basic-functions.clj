@@ -27,7 +27,11 @@
   ([uri]
    { :uri uri :cmd-line (get (stop-mongo-process-impl uri) :argv) })
   ([uri force]
-   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force) :argv) } ))
+   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force) :argv) } )
+  ([uri ^String user ^String pw]
+   { :uri uri :cmd-line (get (stop-mongo-process-impl uri user pw) :argv) })
+  ([uri force ^String user ^String pw]
+   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force user pw) :argv) } ))
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -35,7 +39,11 @@
   ([uri]
    { :uri uri :cmd-line (get (kill-mongo-process-impl uri) :argv) })
   ([uri force]
-   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force) :argv) } ))
+   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force) :argv) } )
+  ([uri ^String user ^String pw]
+   { :uri uri :cmd-line (get (kill-mongo-process-impl uri user pw) :argv) })
+  ([uri force ^String user ^String pw]
+   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force user pw) :argv) } ))
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
