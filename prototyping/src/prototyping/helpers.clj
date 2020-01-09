@@ -238,10 +238,14 @@
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
-  [uri]
-  (let [members (get (run-replset-get-status uri) :members)
-        active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
-    (count active-members)))
+  ([uri]
+   (let [members (get (run-replset-get-status uri) :members)
+         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
+     (count active-members)))
+  ([uri ^String user ^String pw]
+   (let [members (get (run-replset-get-status uri user pw) :members)
+         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
+     (count active-members))))
 
 (defn is-local-process?
   "Check if the mongo process referenced by the URI is local or not"

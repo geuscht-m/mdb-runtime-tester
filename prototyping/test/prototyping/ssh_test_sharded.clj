@@ -31,10 +31,9 @@
     (let [user             "admin"
           pw               "pw99"
           original-primary (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name)]
-      (println "Original primary is " original-primary)
       (trigger-election "mongodb://rs1.mongodb.test" user pw)
       (Thread/sleep 11000)
-      (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name) original-primary)))))
+      (is (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name) original-primary))))))
 
 
 (deftest test-remote-degrade-rs
@@ -43,11 +42,27 @@
           user   "admin"
           pw     "pw99"
           restart-cmd (make-rs-degraded rs-uri user pw) ]
-      (not (nil? restart-cmd))
+      (is (not (nil? restart-cmd)))
       (Thread/sleep 30000)
       (is (replicaset-degraded? rs-uri user pw))
       (Thread/sleep 1000)
       (restart-cmd)
-      (Thread/sleep 5000)
-      (not (replicaset-degraded? rs-uri user pw)))))
+      (Thread/sleep 8000)
+      (is (not (replicaset-degraded? rs-uri user pw))))))
     
+(deftest test-remote-read-only-rs
+  (testing "Check that we are able to successfully make a replica set read only
+            and restore it afterwards"
+    (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
+          user   "admin"
+          pw     "pw99"
+          restart-cmd (make-rs-read-only rs-uri user pw)]
+      (is (not (nil? restart-cmd)))
+      (Thread/sleep 20000)
+      (is (= (num-active-rs-members rs-uri user pw) 1))
+      (is (replica-set-read-only? rs-uri user pw))
+      (Thread/sleep 1000)
+      (restart-cmd)
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members rs-uri user pw) 3))
+      )))

@@ -63,7 +63,7 @@
     (let [original-primary (get (get-rs-primary "mongodb://localhost:27017") :name)]
       (trigger-election "mongodb://localhost:27017")
       (Thread/sleep 11000)
-      (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) original-primary)))))
+      (is (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) original-primary))))))
 
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping a minority of nodes"
@@ -82,7 +82,7 @@
   (testing "Check that we are able to successfully make a replica set read only
             and restore it afterwards"
     (let [restart-cmd (make-rs-read-only "mongodb://localhost:27017")]
-      (not (nil? restart-cmd))
+      (is (not (nil? restart-cmd)))
       (Thread/sleep 20000)
       (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 2))
       (is (replica-set-read-only? (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))))
