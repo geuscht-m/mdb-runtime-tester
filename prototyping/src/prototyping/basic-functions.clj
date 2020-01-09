@@ -55,9 +55,12 @@
 
 (defn stepdown-primary
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
-  [uri]
-  (let [primary (get (get-rs-primary uri) :name)]
-    (send-mongo-rs-stepdown (make-mongo-uri primary))))
+  ([uri]
+   (let [primary (get (get-rs-primary uri) :name)]
+     (send-mongo-rs-stepdown (make-mongo-uri primary))))
+  ([uri ^String user ^String pw]
+   (let [primary (get (get-rs-primary uri user pw) :name)]
+     (send-mongo-rs-stepdown (make-mongo-uri primary) user pw))))
 
 (defn start-rs-nodes
   "Takes a list of URIs for mongod/mongos that need to be started"

@@ -2,8 +2,12 @@
 
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
-  [rs-uri & forced]
-  (stepdown-primary rs-uri))
+  ([rs-uri]
+   (stepdown-primary rs-uri))
+  ([rs-uri forced]
+   (stepdown-primary rs-uri)) ;; TODO - add forced stepdown
+  ([rs-uri ^String user ^String pw]
+   (stepdown-primary rs-uri user pw)))
 
 
 (defn simulate-maintenance

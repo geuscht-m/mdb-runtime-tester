@@ -206,16 +206,23 @@
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
 (defn- get-rs-members-by-state
-  [uri state]
-  (let [rs-state (run-replset-get-status uri)]
-    ;;(println rs-state "\n")
-    (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state]
+   (let [rs-state (run-replset-get-status uri)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state ^String user ^String pw]
+   (let [rs-state (run-replset-get-status uri user pw)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members)))))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri]
+  ([uri]
   ;;(println "\nTryin to get primary for replica set " uri "\n")
-  (first (get-rs-members-by-state uri "PRIMARY")))
+   (first (get-rs-members-by-state uri "PRIMARY")))
+  ([uri ^String user ^String pw]
+   ;;(println "\nTryin to get primary for replica set " uri "\n")
+   (first (get-rs-members-by-state uri "PRIMARY" user pw))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -381,8 +388,10 @@
 (defn send-mongo-rs-stepdown
   "Sends stepdown to the mongod referenced by the URI
    Note that the call requires a reconnect"
-  [uri]
-  (run-replset-stepdown uri))
+  ([uri]
+   (run-replset-stepdown uri))
+  ([uri ^String user ^String pw]
+   (run-replset-stepdown uri user pw)))
   
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"

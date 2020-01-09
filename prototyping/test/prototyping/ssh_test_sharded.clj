@@ -26,6 +26,17 @@
       (Thread/sleep 5000)
       (not (replicaset-degraded? rs-uri user pw)))))
 
+(deftest test-remote-stepdown
+  (testing "Check that stepping down the primary on an RS works"
+    (let [user             "admin"
+          pw               "pw99"
+          original-primary (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name)]
+      (println "Original primary is " original-primary)
+      (trigger-election "mongodb://rs1.mongodb.test" user pw)
+      (Thread/sleep 11000)
+      (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name) original-primary)))))
+
+
 (deftest test-remote-degrade-rs
   (testing "Check that we can make a remote RS degraded (requires auth on remote RS"
     (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
