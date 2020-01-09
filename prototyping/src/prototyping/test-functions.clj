@@ -23,23 +23,36 @@
 
 (defn- partial-stop-rs
   "Internal helper function to stop _member-num_ members of a replica set.
-   Note - returns the 'undo' method needed to start the members again"
-  [rs-uri member-num]
-  (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))
-        restart-info (doall (map stop-mongo-process stop-members))]
-    ;;(println "\nRestart info" restart-info)
-    (fn [] (if (seq? restart-info)
-             (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
-             (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
+   Note - returns the 'undo' method needed to start the members again."
+  ([rs-uri member-num]
+   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))
+         restart-info (doall (map stop-mongo-process stop-members))]
+     ;;(println "\nRestart info" restart-info)
+     (fn [] (if (seq? restart-info)
+              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
+              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
+  ([rs-uri member-num ^String user ^String password]
+   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num user password)))
+         restart-info (doall (map #(stop-mongo-process % user password) stop-members))]
+     ;;(println "\nRestart info" restart-info)
+     (fn [] (if (seq? restart-info)
+              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
+              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line)))))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
-  [rs-uri]
-  (let [num-members (get-num-rs-members rs-uri)
-        stop-rs-num (quot num-members 2)]
-    ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
-    ;;(println "\nStopping RS members from uri " rs-uri "\n")
-    (partial-stop-rs rs-uri stop-rs-num)))
+  ([rs-uri]
+   (let [num-members (get-num-rs-members rs-uri)
+         stop-rs-num (quot num-members 2)]
+     ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
+     ;;(println "\nStopping RS members from uri " rs-uri "\n")
+     (partial-stop-rs rs-uri stop-rs-num)))
+  ([rs-uri ^String user ^String password]
+   (let [num-members (get-num-rs-members rs-uri user password)
+         stop-rs-num (quot num-members 2)]
+     ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
+     ;;(println "\nStopping RS members from uri " rs-uri "\n")
+     (partial-stop-rs rs-uri stop-rs-num user password))))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."

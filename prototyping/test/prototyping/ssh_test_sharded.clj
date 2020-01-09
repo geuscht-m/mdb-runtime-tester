@@ -10,7 +10,7 @@
             [prototyping.core :refer :all]
             [prototyping.test-helpers :refer :all]))
 
-(deftest test-remote-rs-degradation
+(deftest test-remote-rs-kill-single
   (testing "Make sure we can shut down and restart a random remote replica set member"
     (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
           ;;restart-cmd (make-rs-degraded rs-uri) ]
@@ -23,3 +23,18 @@
       (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))
       (Thread/sleep 5000)
       (not (replicaset-degraded? rs-uri)))))
+
+(deftest test-remote-degrade-rs
+  (testing "Check that we can make a remote RS degraded (requires auth on remote RS"
+    (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
+          user   "admin"
+          pw     "pw99"
+          restart-cmd (make-rs-degraded rs-uri user pw) ]
+      (not (nil? restart-cmd))
+      (Thread/sleep 30000)
+      (is (replicaset-degraded? rs-uri user pw))
+      (Thread/sleep 1000)
+      (restart-cmd)
+      (Thread/sleep 5000)
+      (not (replicaset-degraded? rs-uri user pw)))))
+    
