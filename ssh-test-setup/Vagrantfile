@@ -17,6 +17,9 @@ Vagrant.configure("2") do |config|
       node.vm.hostname = "rs#{i}.mongodb.test"
       node.vm.synced_folder ".", "/vagrant", disabled: true
       node.vm.provision "file", source: "start-mongod-replset-node.sh", destination: "start-mongod-replset-node.sh"
+      node.vm.provision "shell", inline: "[ -d /home/vagrant/data ] || mkdir -p data", privileged: false
+      node.vm.provision "file", source: "test-keyfile", destination: "/home/vagrant/data/keyfile"
+      node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
       node.vm.provision "shell", path: "install-mongodb.sh"
       node.vm.provision "shell", inline: "yum install -y vim"
       node.vm.provision "shell", inline: <<-SHELL
