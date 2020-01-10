@@ -5,10 +5,34 @@
 ;;       It requires a replica set on three hosts,
 ;;       rs[1-3].mongodb.test, running on default
 ;;       ports
-(ns prototyping.ssh-test-sharded
+(ns prototyping.ssh-test-replicaset
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
             [prototyping.test-helpers :refer :all]))
+
+(deftest test-is-mongos-process
+  (testing "Check if we're running against a mongos process - should fail as we're running mongod"
+    (is (not (is-mongos-process? "mongodb://rs1.mongodb.test" "admin" "pw99")))))
+
+(deftest test-is-mongod-process
+  (testing "Check if we're running against a mongod process"
+    (is (is-mongod-process? "mongodb://rs2.mongodb.test" "admin" "pw99"))))
+
+
+;; TODO - check why this call doesn't work against 3.6 w/ auth but does work in 4.0 w/o auth
+;; (deftest test-is-sharded
+;;   (testing "Are we connected to a sharded cluster"
+;;     (is (not (is-sharded-cluster? "mongodb://rs3.mongodb.test" "admin" "pw99")))))
+
+(deftest test-get-rs-topology
+  (testing "Check that we retrieve the correct primary and secondaries from the replset status"
+    (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" "admin" "pw99") :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" "admin" "pw99")))]
+      (println primary)
+      (println secondaries)
+      (not (nil? (re-matches #"mongodb://rs[1-3].mongodb.test" primary)))
+      (not (some #{primary} secondaries))
+      (is  (= (count secondaries) 2)))))
 
 (deftest test-remote-rs-kill-single
   (testing "Make sure we can shut down and restart a random remote replica set member"
@@ -17,14 +41,14 @@
           pw     "pw99"
           ;;restart-cmd (make-rs-degraded rs-uri) ]
           restart-info (kill-mongo-process "mongodb://rs2.mongodb.test" user pw)]
-      (not (nil? restart-info))
+      (is (not (nil? restart-info)))
       (println "Restart info is " restart-info)
       (Thread/sleep 30000)
       (is (replicaset-degraded? rs-uri user pw))
       (Thread/sleep 1000)
       (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))
       (Thread/sleep 5000)
-      (not (replicaset-degraded? rs-uri user pw)))))
+      (is (not (replicaset-degraded? rs-uri user pw))))))
 
 (deftest test-remote-stepdown
   (testing "Check that stepping down the primary on an RS works"

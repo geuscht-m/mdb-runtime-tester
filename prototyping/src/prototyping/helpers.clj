@@ -226,8 +226,10 @@
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri]
-  (get-rs-members-by-state uri "SECONDARY"))
+  ([uri]
+   (get-rs-members-by-state uri "SECONDARY"))
+  ([uri ^String user ^String pw]
+   (get-rs-members-by-state uri "SECONDARY" user pw)))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
@@ -255,27 +257,40 @@
     (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
 
 (defn- get-process-type
-  [uri]
-  (let [conn (mg/connect (parse-mongodb-uri uri))
-        proc-type (get (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true) :process)]
-    (mg/disconnect conn)
-    proc-type))
+  ([uri]
+   (let [conn (mg/connect (parse-mongodb-uri uri))
+         proc-type (get (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true) :process)]
+     (mg/disconnect conn)
+     proc-type))
+  ([uri ^String user ^String pw]
+   (let [conn (connect-wrapper (parse-mongodb-uri uri) user pw)
+         proc-type (get (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true) :process)]
+     (mg/disconnect conn)
+     proc-type)))
   
 (defn check-process-type
-  [parameters]
-  (if (= (type parameters) String)
-    (get-process-type parameters)
-    (first parameters)))
+  ([parameters]
+   (if (= (type parameters) String)
+     (get-process-type parameters)
+     (first parameters)))
+  ([parameters ^String user ^String pw]
+   (if (= (type parameters) String)
+     (get-process-type parameters user pw)
+     (first parameters))))
 
 (defn is-mongod-process?
   "Check if the process referenced by the startup is a mongod process"
-  [parameters]
-  (= (check-process-type parameters) "mongod"))
+  ([parameters]
+   (= (check-process-type parameters) "mongod"))
+  ([parameters ^String user ^String pw]
+   (= (check-process-type parameters user pw) "mongod")))
 
 (defn is-mongos-process?
   "Check if the process referenced by the parameters seq is a mongos process"
-  [parameters]
-  (= (check-process-type parameters) "mongos"))
+  ([parameters]
+   (= (check-process-type parameters) "mongos"))
+  ([parameters ^String user ^String pw]
+   (= (check-process-type parameters user pw) "mongos")))
 
 (defn- spawn-process
   "Helper function that starts an external process"
@@ -450,8 +465,10 @@
 
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
-  [uri]
-  (not (empty? (get-shard-uris uri))))
+  ([uri]
+   (not (empty? (get-shard-uris uri))))
+  ([uri ^String user ^String pw]
+   (not (empty? (get-shard-uris uri user pw)))))
 
 (defn undo-operation
   "On functions that return a closure, execute the closure"

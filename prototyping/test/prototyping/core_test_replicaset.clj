@@ -27,7 +27,7 @@
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
-    (not (is-mongos-process? "mongodb://localhost:27017"))))
+    (is (not (is-mongos-process? "mongodb://localhost:27017")))))
 
 (deftest test-is-mongod-process
   (testing "Check if we're running against a mongod process"
@@ -35,7 +35,7 @@
 
 (deftest test-is-sharded
   (testing "Are we connected to a sharded cluster"
-    (not (is-sharded-cluster? "mongodb://localhost:27017"))))
+    (is (not (is-sharded-cluster? "mongodb://localhost:27017")))))
 
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
@@ -96,7 +96,7 @@
   (testing "Check that we can shut down a mongo process using a signal instead of the
             mongo command"
     (let [cmdline (kill-mongo-process "mongodb://localhost:27017")]
-      (not (nil? cmdline))
+      (is (not (nil? cmdline)))
       (Thread/sleep 15000)
       (is (= (num-active-rs-members "mongodb://localhost:27018") 4))
       (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
@@ -107,7 +107,7 @@
 (deftest test-crash-mongo-process
   (testing "Check that we can successfully 'crash' (kill -9) a mongod and restart it"
     (let [cmdline (kill-mongo-process "mongodb://localhost:27017" true)]
-      (not (nil? cmdline))
+      (is (not (nil? cmdline)))
       (Thread/sleep 15000)
       (is (= (num-active-rs-members "mongodb://localhost:27018") 4))
       (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
