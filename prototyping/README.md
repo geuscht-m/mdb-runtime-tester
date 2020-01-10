@@ -8,14 +8,14 @@ At this point in time, the project does not provide any pre-built binaries. To u
 
 In order to build the binaries, you need the following tools:
 
-- Reasonably recent Java runtime and JDK. The code is currently tested with OpenJDK 11 and OpenJDK 11, however it should run on older versions of the JDK also, likely from JDK 8 upwards.
+- Reasonably recent Java runtime and JDK. The code is currently tested with OpenJDK 11 and OpenJDK 13, however it should run on older versions of the JDK also, likely from JDK 8 upwards.
 - [Leiningen](https://leiningen.org/) as the build and dependency management tool
 
 ## Usage
 
 ### General usage
 
-As of right now the best usage information can be found in tests the prototyping/test/prototyping directory. I recommend looking in the core_test-*.clj files for examples on local tests where the mongods interacted with reside on the local machine, and the ssh_test_*.clj files for tests that involve remote mongods and mongos. In general, you'll have to build a fairly small piece of Clojure code that executes the required actions and, if necessary, undoes them.
+As of right now the best usage information can be found in tests the prototyping/test/prototyping directory. I recommend looking in the core_test-\*.clj files for examples on local tests where the mongods interacted with reside on the local machine, and the ssh_test_\*.clj files for tests that involve remote mongods and mongos. In general, you'll have to build a fairly small piece of Clojure code that executes the required actions and, if necessary, undoes them.
 
 For example, this code snippet triggers an election on the replica set at mongodb://localhost:27017:
 
