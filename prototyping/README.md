@@ -2,6 +2,10 @@
 
 This project contains the test driver framework and associated tests to run database resilicence tests for your application that uses MongoDB.
 
+The purpose of this framework is to allow the user to build and combine test scenarios that the application may encounter during its normal production operation. The scenarios supported range from simple, everyday occurences of a primary election to serious issues like a MongoDB replica set or sharded cluster that is in read-only mode because the majority of its nodes are unavailable.
+
+Please note that these tools are not intended to test your MongoDB deploymnent; rather, they are intended to validate that your application can handle typical issues that it may encounter during its production lifecycle.
+
 ## Installation
 
 At this point in time, the project does not provide any pre-built binaries. To use these tools, please clone or fork the repository and build the binaries locally.
@@ -10,6 +14,8 @@ In order to build the binaries, you need the following tools:
 
 - Reasonably recent Java runtime and JDK. The code is currently tested with OpenJDK 11 and OpenJDK 13, however it should run on older versions of the JDK also, likely from JDK 8 upwards.
 - [Leiningen](https://leiningen.org/) as the build and dependency management tool
+
+To build, execute the appropriate Leiningen task in the root directory of this project.
 
 ## Usage
 
@@ -23,9 +29,11 @@ For example, this code snippet triggers an election on the replica set at mongod
 
 Here's another code snippet that degrades a replica set by shutting down a minority number of nodes, waits 30 seconds and then undoes the 'stop' action:
 
-`(let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
+```
+(let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
       (Thread/sleep 30000)
       (restart-cmd))`
+```
 
 Note the assignment to `restart-cmd` - the `make-rs-degraded` function returns a closure that, when executed, undoes the actions taken to degrade the replica set. All the test functions that have undoable results follow this pattern.
 
@@ -35,7 +43,17 @@ I have some plans to support driving the basic tests through a declarative langu
 
 The code for the test driver uses [clj-ssh](https://github.com/clj-commons/clj-ssh) to execute remote OS commands on replica set members. clj-ssh relies on ssh-agent to provide keys to log in to the remote servers. Note that the user associated with the ssh key needs to have the appropriate privileges on the target system to start and stop processes, specifically mongod and mongos. Most importantly, if you use the framework to shut down a remote mongod, the user you use to log into the remote system must have appropriate access rights so mongods and mongos started by it can read their configuration files and read/write to the database, log and journal paths.
 
+## Contributing and testing
+
+Pull requests are welcome. That said, please note that there are two test setups that the code needs to be run against and succeed.
+
+For local tests (ie, those tests that only interact with processes on localhost) the `set-up-test-env.sh` script generates the necessary configurations in $HOME/tmp. Note that this script and the local tests both require [mtools](https://github.com/rueckstiess/mtools), specifically `mlaunch`.
+
+The remote tests use the vagrant setup that is located in mdb-runtime-tester/ssh-test-setup. And yes, I am planning to consolidate the two.
+
 ## Current state and limitations
+
+TL;DR - it's early on in the project's lifecycle, don't use it in a production environment.
 
 The very basic tests are usable, but require a fair amount of care. The project is under active development and in its early stages, so bugs are still features. Pull requests are welcome :).
 
