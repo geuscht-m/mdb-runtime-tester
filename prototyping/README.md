@@ -1,44 +1,61 @@
-# prototyping
+# Test driver for application resilience tests
 
-FIXME: description
+This project contains the test driver framework and associated tests to run database resilicence tests for your application that uses MongoDB.
 
 ## Installation
 
-Download from http://example.com/FIXME.
+At this point in time, the project does not provide any pre-built binaries. To use these tools, please clone or fork the repository and build the binaries locally.
+
+In order to build the binaries, you need the following tools:
+
+- Reasonably recent Java runtime and JDK. The code is currently tested with OpenJDK 11 and OpenJDK 11, however it should run on older versions of the JDK also, likely from JDK 8 upwards.
+- [Leiningen](https://leiningen.org/) as the build and dependency management tool
 
 ## Usage
 
-FIXME: explanation
+### General usage
 
-    $ java -jar prototyping-0.1.0-standalone.jar [args]
+As of right now the best usage information can be found in tests the prototyping/test/prototyping directory. I recommend looking in the core_test-*.clj files for examples on local tests where the mongods interacted with reside on the local machine, and the ssh_test_*.clj files for tests that involve remote mongods and mongos. In general, you'll have to build a fairly small piece of Clojure code that executes the required actions and, if necessary, undoes them.
 
-## Options
+For example, this code snippet triggers an election on the replica set at mongodb://localhost:27017:
 
-FIXME: listing of options this app accepts.
+`(trigger-election "mongodb://localhost:27017")`
 
-## Examples
+Here's another code snippet that degrades a replica set by shutting down a minority number of nodes, waits 30 seconds and then undoes the 'stop' action:
 
-...
+`(let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
+      (Thread/sleep 30000)
+      (restart-cmd))`
 
-### Bugs
+Note the assignment to `restart-cmd` - the `make-rs-degraded` function returns a closure that, when executed, undoes the actions taken to degrade the replica set. All the test functions that have undoable results follow this pattern.
 
-...
+I have some plans to support driving the basic tests through a declarative language - most likely YAML - but this is one of my "when I get around to it" items.
 
-### Any Other Sections
-### That You Think
-### Might be Useful
+### Specific considerations for interacting with remote servers
 
-## License
+The code for the test driver uses [clj-ssh](https://github.com/clj-commons/clj-ssh) to execute remote OS commands on replica set members. clj-ssh relies on ssh-agent to provide keys to log in to the remote servers. Note that the user associated with the ssh key needs to have the appropriate privileges on the target system to start and stop processes, specifically mongod and mongos. Most importantly, if you use the framework to shut down a remote mongod, the user you use to log into the remote system must have appropriate access rights so mongods and mongos started by it can read their configuration files and read/write to the database, log and journal paths.
 
-Copyright © 2019 FIXME
+## Current state and limitations
 
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
+The very basic tests are usable, but require a fair amount of care. The project is under active development and in its early stages, so bugs are still features. Pull requests are welcome :).
 
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
+Known limitations at the moment are:
+- The restart code currently entirely relies on the command line that mongod returns as part of the server status. This means that under Linux OSs, the code currently can't distinguish between MongoDB processes that have been started manually or via script, and ones that have been started as services.
+- Currently there is no way to configure the remote ssh user
+- There is currently no support for ssh jump hosts
+
+## Currently supported operating systems
+
+The code is currently tested on Linux and macOS. I've not tested it on Windows and don't expect it to work on Windows as a target system due to its reliance on ssh for remote process execution. The driver should work from WSL but I have not tested that yet, either.
+
+## Third party modules used
+
+Shout out to the following projects that I use to build these tools. 
+
+- [Clojure](http://clojure.org)
+- [Leiningen](https://leiningen.org)
+- [Monger](https://github.com/michaelklishin/monger), to talk to MongoDB from Clojure. Although in certain places I reach through straight to the Java driver
+- [Urly](https://github.com/michaelklishin/urly) for URL parsingü
+- [clj-ssh](https://github.com/clj-commons/clj-ssh) to interact with ssh for remote servers
+- [clojure-jna](https://github.com/Chouser/clojure-jna/) for simple interaction with the C runtime library from Clojure
+- [timbre](https://github.com/ptaoussanis/timbre) and [slf4j-timbre](https://github.com/fzakaria/slf4j-timbre) to interact with slf4j logging

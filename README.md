@@ -27,4 +27,4 @@ These types of events are more likely to affect the user experience of your appl
 
 ## Supported environments
 
-The test components are currently tested on Linux and macOS. It is not currently tested on Windows and unlikely to work on Windows for now, as it uses ssh to interact with remote servers.
+The test components are currently tested on Linux and macOS. They are not currently tested on Windows and unlikely to work on Windows for now, as they use ssh to interact with remote servers.
