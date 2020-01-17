@@ -30,7 +30,6 @@ Vagrant.configure("2") do |config|
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
       end
-      node.vm.provision "hosts", :sync_hosts => true
     end
   end
   
@@ -39,16 +38,19 @@ Vagrant.configure("2") do |config|
     tester.vm.network :private_network, ip: "192.168.31.98"
     tester.vm.hostname = "testdriver.mongodb.test"
     tester.vm.provision "file", source: "init-replicaset.js", destination: "init-replicaset.js"
-    tester.vm.provision "shell", inline: "sudo yum install -y java-11-openjdk git emacs-nox wget"
+    tester.vm.provision "file", source: "setup-test-env.sh", destination: "setup-test-env.sh"
+    tester.vm.provision "shell", inline: "sudo yum install -y java-11-openjdk git emacs-nox wget epel-release"
+    tester.vm.provision "shell", inline: "sudo yum install -y python-pip python-devel"
+    tester.vm.provision "shell", inline: "sudo pip install mtools==1.5.3 psutil pymongo"
     tester.vm.provision "shell", path: "install-leiningen.sh"
-    tester.vm.provision "shell", path: "install-mongo-shell.sh"
+    tester.vm.provision "shell", path: "install-mongodb.sh"
     tester.vm.provision "shell", inline: "mkdir -p git-repo/mdb-runtime-tester"
     tester.vm.provision "hosts", :sync_hosts => true
     tester.vm.provision "shell", inline: "[ -f /home/vagrant/.ssh/id_ecdsa ] || ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
     tester.vm.synced_folder ".", "/vagrant", disabled: true
     tester.vm.synced_folder "../../mdb-runtime-tester/", "/home/vagrant/git-repo/mdb-runtime-tester"
     tester.vm.provider "virtualbox" do |vb|
-      vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
+      vb.customize ["modifyvm", :id, "--cpus", "2", "--memory", "3096"]
     end    
   end
 end

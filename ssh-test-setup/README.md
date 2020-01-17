@@ -4,6 +4,16 @@ The Vagrant setup in this directory is used for executing the remote tests in th
 
 *Note that this is not a recommended MongoDB setup using Vagrant, but specific to this test environment*
 
+## Setup
+
+This vagrant configuration expects the following Vagrant plugins, otherwise it will not work:
+
+- vagrant-disksize
+- vagrant-hosts
+- vagrant-vbguest
+
+The vagrant-cachier plugin is not required, but recommended.
+
 ## Usage
 
 ### Prepping the test environment
