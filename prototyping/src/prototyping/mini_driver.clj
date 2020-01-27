@@ -3,7 +3,7 @@
 (require          '[prototyping.conv-helpers :as pcv]
                   '[clojure.string           :as str])
 (import [com.mongodb.client MongoClients MongoClient]
-        [com.mongodb ConnectionString])
+        [com.mongodb ConnectionString ReadPreference])
 
 (defn ^MongoClient mdb-connect-with-uri
   "Use a MongoDB URI to connecto to a mongos/mongod/replica set/cluster"
@@ -20,26 +20,17 @@
 (defn mdb-disconnect
   [^MongoClient conn]
   (.close conn))
-  
-
-
-;; (defn ^MongoClient mdb-connect
-;;   "Connect to a mongos, mongod or replica set"
-;;   ;;([^String uri]
-;;   ;;(mdb-connect-with-uri uri))
-;;   [conn-info]
-;;   (case (type conn-info)
-;;     ^String             (mdb-connect-with-uri conn-info)
-;;     ^PersistentArrayMap (.create MongoClients conn-info)
-
-
 
 (defn mdb-run-command
   "Run a MongoDB command against a database"
-  [^MongoClient conn ^String dbname command]
-  (pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command)) true))
+  ([^MongoClient conn ^String dbname command]
+   (pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command)) true))
+  ([^MongoClient conn ^String dbname command ^ReadPreference pref]
+   (pcv/from-bson-document (.runCommand (.withReadPreference (.getDatabase conn dbname) pref) (pcv/to-bson-document command)) true)))
 
 (defn mdb-admin-command
   "Run a MongoDB command against the admin database"
-  [^MongoClient conn command]
-  (mdb-run-command conn "admin" command))
+  ([^MongoClient conn command]
+   (mdb-run-command conn "admin" command))
+  ([^MongoClient conn command ^ReadPreference pref]
+   (mdb-run-command conn "admin" command pref)))

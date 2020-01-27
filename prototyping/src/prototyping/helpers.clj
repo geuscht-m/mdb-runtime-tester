@@ -109,7 +109,7 @@
 
 (defn- run-replset-get-config
   "Returns the output of mongodb's replSetGetConfig admin command"
-  ([uri]
+  ([uri]   
    (let [conn           (connect-wrapper (parse-mongodb-uri uri))
         replset-config (admin-cmd conn { :replSetGetConfig 1 })]
     (mg/disconnect conn)
@@ -123,10 +123,9 @@
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
   ([uri]
-   (let [conn-info      (parse-mongodb-uri uri)
-         conn           (connect-wrapper conn-info)
-         replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
-     (mg/disconnect conn)
+   (let [conn           (md/mdb-connect uri)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+     (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password]
    (let [conn-info      (parse-mongodb-uri uri)
@@ -138,9 +137,9 @@
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
   [uri]
-  (let [conn       (connect-wrapper (parse-mongodb-uri uri))
-        shard-map  (admin-cmd conn { :getShardMap 1 })]
-    (mg/disconnect conn)
+  (let [conn       (md/mdb-connect uri)
+        shard-map  (md/mdb-admin-command conn { :getShardMap 1 })]
+    (md/mdb-disconnect conn)
     shard-map))
 
 (defn- run-replset-stepdown
@@ -203,8 +202,8 @@
 
 (defn- run-server-status
   "Run the serverStatus command and return the result as a map"
-  [conn-info]
-  (mcv/from-db-object (run-cmd conn-info { :serverStatus 1 }) true))
+  [^MongoClient conn]
+  (md/mdb-admin-command conn { :serverStatus 1 }))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
@@ -356,11 +355,11 @@
      - force = false/nil - use SIGTERM for orderly shutdown
      - force = true      - use SIGKILL to simulate crash"
   ([uri force]
-   (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn          (md/mdb-connect (make-mongo-uri uri))
          cmd-line      (run-server-get-cmd-line-opts conn)
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      (if force
        (jna/invoke Integer c/kill pid 9)
        (jna/invoke Integer c/kill pid 15))
