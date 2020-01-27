@@ -7,12 +7,14 @@
          '[monger.conversion :as mcv]
          '[monger.credentials :as mcr]
          '[prototyping.conv-helpers :as pcv]
+         '[prototyping.mini-driver :as md]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[net.n01se.clojure-jna  :as jna]
          '[clj-ssh.ssh :as ssh])
 (import  [java.lang ProcessBuilder]
-         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
+         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference]
+         [com.mongodb.client MongoClient])
 
 (defn- get-hostname
   []
@@ -31,7 +33,7 @@
 ;; Generally available helper functions
 
 (defn make-mongo-uri
-  [hostinfo]
+  [^String hostinfo]
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
@@ -167,7 +169,7 @@
   ;; NOTE: running shutdown will trigger an exception as the database
   ;;       connection will close. Catch and discard the exception here
   (try
-    (run-cmd conn-info { :shutdown 1 :force force })
+    (md/mdb-admin-command conn-info { :shutdown 1 :force force })
     (catch com.mongodb.MongoSocketReadException e
       (println "Exception caught as expected"))
     (catch java.lang.NullPointerException e
@@ -194,8 +196,10 @@
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
-  [conn-info]
-  (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true))
+  ;;([conn-info]
+  ;; (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true)))
+  [^MongoClient conn]
+  (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
 
 (defn- run-server-status
   "Run the serverStatus command and return the result as a map"
@@ -323,29 +327,29 @@
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
   ([uri]
-   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn (md/mdb-connect (make-mongo-uri uri))
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline))
   ([uri force]
-   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn (md/mdb-connect (make-mongo-uri uri))
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
-     (mg/disconnect conn)
-     cmdline))
-  ([uri ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn)
-     (mg/disconnect conn)
-     cmdline))
-  ([uri force ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn force)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline)))
+  ;; ([uri ^String username ^String password]
+  ;;  (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+  ;;        cmdline (run-server-get-cmd-line-opts conn)]
+  ;;    (run-shutdown-command conn)
+  ;;    (mg/disconnect conn)
+  ;;    cmdline))
+  ;; ([uri force ^String username ^String password]
+  ;;  (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+  ;;        cmdline (run-server-get-cmd-line-opts conn)]
+  ;;    (run-shutdown-command conn force)
+  ;;    (mg/disconnect conn)
+  ;;    cmdline)))
 
 (defn- kill-local-mongo-process-impl
   "Kill the mongodb process via OS signal. There are two options:
