@@ -48,7 +48,7 @@
 
 (deftest test-degraded-single-shard
   (testing "Check that we can create a degraded single shard with the minority of nodes on a single shard disabled"
-    (let [shard-uri "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"
+    (let [shard-uri "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"
           restart (make-shard-degraded shard-uri)]
       (Thread/sleep 11000)
       (is (shard-degraded? shard-uri))
@@ -71,12 +71,13 @@
 
 (deftest test-read-only-single-shard
   (testing "Check that we turn a single (first) shard on a cluster read only"
-    (let [restart  (make-shard-read-only "" "mongodb://localhost:27018")]
+    (let [restart   (make-shard-read-only "" "mongodb://localhost:27018")
+          shard-uri "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"]
       (Thread/sleep 15000)  ;; Ensure that the replica set has enough time for an election
-      (is (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+      (is (shard-read-only? shard-uri))
       (restart)
       (Thread/sleep 10000)
-      (not (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+      (not (shard-read-only? shard-uri))
     )))
 
 (deftest test-read-only-complete-cluster
