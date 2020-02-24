@@ -474,9 +474,18 @@
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
   ([uri]
-   (not (empty? (get-shard-uris uri))))
+   (try
+     (let [shard-uris (get-shard-uris uri)] 
+       (not (empty? shard-uris)))
+     (catch com.mongodb.MongoCommandException e
+       ;; Note - add log output just in case
+       nil)))
   ([uri ^String user ^String pw]
-   (not (empty? (get-shard-uris uri user pw)))))
+   (try
+     (let [shard-uris (get-shard-uris uri user pw)]
+       (not (empty? shard-uris)))
+     (catch com.mongodb.MongoCommandException e
+       nil))))
 
 (defn undo-operation
   "On functions that return a closure, execute the closure"
