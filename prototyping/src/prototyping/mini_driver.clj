@@ -3,7 +3,7 @@
 (require          '[prototyping.conv-helpers :as pcv]
                   '[clojure.string           :as str])
 (import [com.mongodb.client MongoClients MongoClient]
-        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings$Builder])
+        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings])
 
 (defn ^MongoClient mdb-connect-with-uri
   "Use a MongoDB URI to connecto to a mongos/mongod/replica set/cluster"
@@ -17,10 +17,11 @@
        (MongoClients/create settings))
      (MongoClients/create mongo-uri)))
   ([^String mongo-uri ^String username ^String pwd]
+   (println mongo-uri)
    (if (str/starts-with? mongo-uri "mongodb://")
      (let [settings (ConnectionString. mongo-uri)
            cred     (MongoCredential/createCredential username "admin" (char-array pwd))]
-       (MongoClients/create (.build (.credential (.applyConnectionString (.builder MongoClientSettings$Builder) settings) cred))))
+       (MongoClients/create (.build (.credential (.applyConnectionString (MongoClientSettings/builder) settings) cred))))
      nil)))
 
 (defn mdb-disconnect

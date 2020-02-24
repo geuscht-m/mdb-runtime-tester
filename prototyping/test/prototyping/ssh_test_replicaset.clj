@@ -36,7 +36,7 @@
 
 (deftest test-remote-rs-kill-single
   (testing "Make sure we can shut down and restart a random remote replica set member"
-    (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
+    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
           ;;restart-cmd (make-rs-degraded rs-uri) ]
@@ -62,7 +62,7 @@
 
 (deftest test-remote-degrade-rs
   (testing "Check that we can make a remote RS degraded (requires auth on remote RS"
-    (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
+    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
           restart-cmd (make-rs-degraded rs-uri user pw) ]
@@ -77,7 +77,7 @@
 (deftest test-remote-read-only-rs
   (testing "Check that we are able to successfully make a replica set read only
             and restore it afterwards"
-    (let [rs-uri "mongodb://replTest/rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test"
+    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
           restart-cmd (make-rs-read-only rs-uri user pw)]

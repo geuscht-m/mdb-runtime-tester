@@ -208,6 +208,7 @@
   ;;([conn-info]
   ;; (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true)))
   [^MongoClient conn]
+  (println conn)
   (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
 
 (defn- run-server-status
@@ -342,19 +343,19 @@
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
      (md/mdb-disconnect conn)
+     cmdline))
+  ([uri ^String username ^String password]
+   (let [conn    (md/mdb-connect uri username password)
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn)
+     (md/mdb-disconnect conn)
+     cmdline))
+  ([uri force ^String username ^String password]
+   (let [conn (md/mdb-connect uri username password)
+         cmdline (run-server-get-cmd-line-opts conn)]
+     (run-shutdown-command conn force)
+     (md/mdb-disconnect conn)
      cmdline)))
-  ;; ([uri ^String username ^String password]
-  ;;  (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
-  ;;        cmdline (run-server-get-cmd-line-opts conn)]
-  ;;    (run-shutdown-command conn)
-  ;;    (mg/disconnect conn)
-  ;;    cmdline))
-  ;; ([uri force ^String username ^String password]
-  ;;  (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
-  ;;        cmdline (run-server-get-cmd-line-opts conn)]
-  ;;    (run-shutdown-command conn force)
-  ;;    (mg/disconnect conn)
-  ;;    cmdline)))
 
 (defn- kill-local-mongo-process-impl
   "Kill the mongodb process via OS signal. There are two options:
