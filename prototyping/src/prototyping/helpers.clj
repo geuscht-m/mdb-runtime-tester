@@ -95,6 +95,7 @@
 ;;      cmd-result)))
 (defn- run-serverstatus
   ([uri]
+   (println "Trying to run server status on " uri "\n")
    (let [conn (md/mdb-connect uri)
          server-status (md/mdb-admin-command conn { :serverStatus 1 })]
      (md/mdb-disconnect conn)
@@ -453,13 +454,20 @@
      ;;(println shard-map)
      (str/split (get (get shard-map :map) :config) #","))))
 
+(defn- convert-shard-uri
+  [from-list-shards]
+  (let [components (re-matches #"(.*)/(.*)" from-list-shards)]
+    (str "mongodb://" (get components 2) "/?replicaSet=" (get components 1))))
+
 (defn get-shard-uris
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
-   cluster-uri _must_ point to the mongos for correct discovery."
+   cluster-uri _must_ point to the mongos for correct discovery.
+   Note that listShards returns the shard replsets in a different format
+   so we have to transform them before returning the list"
   ([cluster-uri]
   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
    (let [shard-configs (run-listshards cluster-uri)]
-     (map #(get % :host) (get shard-configs :shards))))
+     (map #(convert-shard-uri (get % :host)) (get shard-configs :shards))))
   ([cluster-uri ^String username ^String password]
    ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
    (let [shard-configs (run-listshards cluster-uri username password)]

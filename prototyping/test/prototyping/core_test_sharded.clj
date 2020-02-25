@@ -40,7 +40,9 @@
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
     (is (= (get-shard-uris "mongodb://localhost:27017")
-           (list "shard01/localhost:27018,localhost:27019,localhost:27020" "shard02/localhost:27021,localhost:27022,localhost:27023" "shard03/localhost:27024,localhost:27025,localhost:27026")))))
+           (list "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"
+                 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
+                 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03")))))
 
 (deftest test-is-sharded
   (testing "Are we connected to a sharded cluster"
