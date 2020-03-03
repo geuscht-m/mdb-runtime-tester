@@ -2,10 +2,10 @@
 
 (in-ns 'prototyping.core)
 (require '[clojure.string :as str]
-         '[monger.core :as mg]
-         '[monger.command :as mcmd]
-         '[monger.conversion :as mcv]
-         '[monger.credentials :as mcr]
+         ;; '[monger.core :as mg]
+         ;; '[monger.command :as mcmd]
+         ;; '[monger.conversion :as mcv]
+         ;; '[monger.credentials :as mcr]
          '[prototyping.conv-helpers :as pcv]
          '[prototyping.mini-driver :as md]
          '[clojure.java.shell :refer [sh]]
@@ -129,7 +129,7 @@
   ([uri ^String username ^String password]
    (let [conn           (md/mdb-connect uri username password)
          replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      replset-config)))
 
 (defn run-replset-get-status
@@ -139,9 +139,19 @@
          replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
      (md/mdb-disconnect conn)
      replset-status))
+  ([uri ^ReadPreference rp]
+   (let [conn           (md/mdb-connect uri)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
+     (md/mdb-disconnect conn)
+     replset-status))
   ([uri ^String username ^String password]
    (let [conn           (md/mdb-connect uri username password)
          replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+     (md/mdb-disconnect conn)
+     replset-status))
+  ([uri ^String username ^String password ^ReadPreference rp]
+   (let [conn           (md/mdb-connect uri username password)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
      (md/mdb-disconnect conn)
      replset-status)))
 
@@ -225,8 +235,16 @@
    (let [rs-state (run-replset-get-status uri)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state ^ReadPreference rp]
+   (let [rs-state (run-replset-get-status uri rp)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members))))
   ([uri state ^String user ^String pw]
    (let [rs-state (run-replset-get-status uri user pw)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state ^String user ^String pw ^ReadPreference rp]
+   (let [rs-state (run-replset-get-status uri user pw rp)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members)))))
 
@@ -235,9 +253,14 @@
   ([uri]
   ;;(println "\nTryin to get primary for replica set " uri "\n")
    (first (get-rs-members-by-state uri "PRIMARY")))
+  ([uri ^ReadPreference rp]
+   (first (get-rs-members-by-state uri "PRIMARY" rp)))
   ([uri ^String user ^String pw]
    ;;(println "\nTryin to get primary for replica set " uri "\n")
-   (first (get-rs-members-by-state uri "PRIMARY" user pw))))
+   (first (get-rs-members-by-state uri "PRIMARY" user pw)))
+  ([uri ^String user ^String pw ^ReadPreference rp]
+   (first (get-rs-members-by-state uri "PRIMARY" user pw rp))))
+
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
