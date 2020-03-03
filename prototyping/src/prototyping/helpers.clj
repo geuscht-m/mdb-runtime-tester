@@ -2,10 +2,6 @@
 
 (in-ns 'prototyping.core)
 (require '[clojure.string :as str]
-         ;; '[monger.core :as mg]
-         ;; '[monger.command :as mcmd]
-         ;; '[monger.conversion :as mcv]
-         ;; '[monger.credentials :as mcr]
          '[prototyping.conv-helpers :as pcv]
          '[prototyping.mini-driver :as md]
          '[clojure.java.shell :refer [sh]]
@@ -37,21 +33,6 @@
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
-
-;; (defn- connect-wrapper
-;;   ([conn-info]
-;;    (let [connection-info (if (map? conn-info) (ServerAddress. (get conn-info :host) (get conn-info :port)) conn-info)
-;;          options         (.build (.readPreference (MongoClientOptions$Builder.) (ReadPreference/primaryPreferred)))]
-;;      ;;(println "\nCreating connection with primaryPreferred read pref\n\n")
-;;      (mg/connect connection-info options)))
-;;   ([conn-info ^String username ^String password]
-;;    (let [connection-info (if (map? conn-info) (ServerAddress. (get conn-info :host) (get conn-info :port)) conn-info)
-;;          options         (.build (.readPreference (MongoClientOptions$Builder.) (ReadPreference/primaryPreferred)))
-;;          cred            (mcr/create username "admin" password)]
-;;      ;;(println "\nCreating connection with primaryPreferred read pref\n\n")
-;;      (mg/connect connection-info options cred))))
- 
-
 
 ;; URI parsing helper
 (defn- parse-mongodb-uri
