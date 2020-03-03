@@ -36,7 +36,7 @@
   ([^MongoClient conn ^String dbname command]
    (pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command)) true))
   ([^MongoClient conn ^String dbname command ^ReadPreference pref]
-   (println "Running command " command " with read preference " pref)
+   ;;(println "Running command " command " with read preference " pref)
    (pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command) pref) true)))
 
 (defn mdb-admin-command
@@ -44,5 +44,5 @@
   ([^MongoClient conn command]
    (mdb-run-command conn "admin" command))
   ([^MongoClient conn command ^ReadPreference pref]
-   (println "\nRunning admin command " command " with read preference " pref)
+   ;;(println "\nRunning admin command " command " with read preference " pref)
    (mdb-run-command conn "admin" command pref)))
