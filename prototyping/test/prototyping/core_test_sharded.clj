@@ -30,12 +30,12 @@
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should be a yes"
     (is (is-mongos-process? "mongodb://localhost:27017"))
-    (not (is-mongos-process? "mongodb://localhost:27018"))))
+    (is (not (is-mongos-process? "mongodb://localhost:27018")))))
 
 (deftest test-is-mongod-process
   (testing "Check various processes to verify that they're mongods or not"
     (is (is-mongod-process? "mongodb://localhost:27018"))
-    (not (is-mongod-process? "mongodb://localhost:27017"))))
+    (is (not (is-mongod-process? "mongodb://localhost:27017")))))
 
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
@@ -56,7 +56,7 @@
       (is (shard-degraded? shard-uri))
       (restart)
       (Thread/sleep 3000)
-      (not (shard-degraded? shard-uri))
+      (is (not (shard-degraded? shard-uri)))
     )))
 
 (deftest test-degraded-all-shards
@@ -68,7 +68,7 @@
       (is (cluster-degraded? cluster-uri))
       (doall restart)
       (Thread/sleep 3000)
-      (not (cluster-degraded? cluster-uri))
+      (is (not (cluster-degraded? cluster-uri)))
     )))
 
 (deftest test-read-only-single-shard
@@ -78,8 +78,8 @@
       (Thread/sleep 15000)  ;; Ensure that the replica set has enough time for an election
       (is (shard-read-only? shard-uri))
       (restart)
-      (Thread/sleep 10000)
-      (not (shard-read-only? shard-uri))
+      (Thread/sleep 12000)
+      (is (not (shard-read-only? shard-uri)))
     )))
 
 (deftest test-read-only-complete-cluster
@@ -87,9 +87,9 @@
     (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
           shard-list (get-shard-uris "mongodb://localhost:27017")]
       ;;(println "\n" shard-list)
-      (Thread/sleep 11000)
+      (Thread/sleep 15000)
       (is (shards-read-only? shard-list))
       (doall restart)
-      (Thread/sleep 3000)
-      (not (shards-read-only? shard-list))
+      (Thread/sleep 12000)
+      (is (not (shards-read-only? shard-list)))
     )))
