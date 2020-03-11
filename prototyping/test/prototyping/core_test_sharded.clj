@@ -4,24 +4,20 @@
             [prototyping.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
-(defn- start-sharded-cluster
-  []
+(defn- control-sharded-cluster
+  "Control sharded cluster used for testing via mlaunch. Currently
+   only supports start/stop commands"
+  [cmd]
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test/sharded"))))
-
-(defn- stop-sharded-cluster
-  []
-  (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test/sharded"))))
+    (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/sharded"))))
 
 (defn wrap-sharded-tests [f]
-  (start-sharded-cluster)
+  (control-sharded-cluster "start")
   (Thread/sleep 15000)
   (f)
-  (stop-sharded-cluster))
+  (control-sharded-cluster "stop"))
 
 (use-fixtures :each wrap-sharded-tests)
-
 
 (deftest test-get-config-servers-uri
   (testing "Try to retrieve the URIs of the config servers"
