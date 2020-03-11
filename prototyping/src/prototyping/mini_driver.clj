@@ -17,12 +17,12 @@
        (MongoClients/create settings))
      (MongoClients/create mongo-uri)))
   ([^String mongo-uri ^String username ^String pwd]
-   (println mongo-uri)
+   ;;(println mongo-uri)
    (if (str/starts-with? mongo-uri "mongodb://")
      (let [settings (ConnectionString. mongo-uri)
            cred     (MongoCredential/createCredential username "admin" (char-array pwd))]
-       (println "Attempting to connect to " mongo-uri)
-       (println "With settiongs " settings)
+       ;;(println "Attempting to connect to " mongo-uri)
+       ;;(println "With settiongs " settings)
        (MongoClients/create (.build (.credential (.applyConnectionString (MongoClientSettings/builder) settings) cred))))
      ((println "URI " mongo-uri " doesn't comply with URI format")
       nil))))
