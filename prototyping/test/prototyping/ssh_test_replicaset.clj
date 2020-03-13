@@ -29,8 +29,8 @@
     (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" "admin" "pw99") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" "admin" "pw99")))]
       (println "Remote primary is " primary)
-      (println "Remote econdaries is " secondaries)
-      (is (not (nil? (re-matches #"rs[1-3].mongodb.test" primary))))
+      (println "Remote secondaries are " secondaries)
+      (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
       (is (not (some #{primary} secondaries)))
       (is (= (count secondaries) 2)))))
 
