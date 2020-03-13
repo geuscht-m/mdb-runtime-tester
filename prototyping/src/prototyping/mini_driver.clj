@@ -11,11 +11,12 @@
   (.create MongoClients uri))
 
 (defn ^MongoClient mdb-connect
-  ([^String mongo-uri]
+  ([mongo-uri]
    (if (str/starts-with? mongo-uri "mongodb://")
      (let [settings (ConnectionString. mongo-uri)]
        (MongoClients/create settings))
      (MongoClients/create mongo-uri)))
+  
   ([^String mongo-uri ^String username ^String pwd]
    ;;(println mongo-uri)
    (if (str/starts-with? mongo-uri "mongodb://")

@@ -28,8 +28,11 @@
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
   ([rs-uri]
+   (println "Checking if replica set at " rs-uri " is degraded or not")
    (let [rs-status (get (run-replset-get-status rs-uri) :members)
-         degraded  (doall (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status))]
+         ;;degraded  (doall (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status))]
+         degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
+     (println "Degraded replica set members " degraded "\n")
      (some identity degraded)))
   ([rs-uri ^String user ^String pw]
    (let [rs-status (get (run-replset-get-status rs-uri user pw) :members)
@@ -43,11 +46,11 @@
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"
   ([rs-uri]
-   (let [primary (get-rs-primary (make-mongo-uri rs-uri) (ReadPreference/primaryPreferred))
-         replset (run-replset-get-status (make-mongo-uri rs-uri))]
+   (println "Trying to get primary for URI " rs-uri)
+   (let [primary (get-rs-primary rs-uri (ReadPreference/primaryPreferred))]
      ;;replset     (run-replset-get-status mongo-uri user pw)]
-     (println "\nget-rs-primary returned " primary "\n")
-     (println "\nget-replset-status returned " (get replset :members) "\n")
+     ;;(println "\nget-rs-primary returned " primary "\n")
+     ;;(println "\nget-replset-status returned " (get replset :members) "\n")
      (nil? primary)))
   ([rs-uri ^String user ^String pw]
    (let [mongo-uri   (make-mongo-uri rs-uri)
@@ -77,12 +80,15 @@
   "Check that all shards on a cluster are in degraded state"
   [cluster-uri]
   (let [shard-list (get-shard-uris cluster-uri)]
-    (and (map #(replicaset-degraded? (convert-shard-uri-to-mongo-uri %)) shard-list))))
+    (println "Check shard list for cluster degradation at uri " cluster-uri)
+    (println "Shard list is " shard-list)
+    (and (map #(replicaset-degraded? %) shard-list))))
 
 (defn shards-read-only?
   "Check if all shards of a sharded cluster are read only."
-  [cluster-uri]
-  ;;(println "\nGetting shard uris for cluster uri " cluster-uri "\n")
-  (let [shards (if (= (type cluster-uri) String) (get-shard-uris cluster-uri) cluster-uri)]
+  [uri]
+  (if (seq? uri)
+    (and (map #(replica-set-read-only? %) uri))
+    (let [shards (get-shard-uris uri)]
       ;;(println "\nShards: " shards "\n")
-      (and (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards))))
+      (and (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards)))))

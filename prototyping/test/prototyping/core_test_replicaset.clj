@@ -5,25 +5,22 @@
             [prototyping.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
-(defn- start-test-rs
-  []
-  ;;(println (System/getenv "PATH"))
+(defn- control-test-rs
+  "Controls test replica set start/stop using mlaunch"
+  [cmd]
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test/replica"))))
-
-(defn- stop-test-rs
-  []
-  (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test/replica"))))
+    (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica"))))
 
 (defn- wrap-rs-tests
   [f]
-  (start-test-rs)
+  (control-test-rs "start")
   (Thread/sleep 10000) ;; Let the RS stablize
   (f)
-  (stop-test-rs))
+  (control-test-rs "stop")
+  (Thread/sleep 3000))    ;; Give the shutdown some time to work before triggering the next setup
 
 (use-fixtures :each wrap-rs-tests)
+
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
@@ -41,11 +38,11 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
-      (println "Local primary is " primary)
-      (println "Local secondaries are " secondaries)
+      ;;(println "Local primary is " primary)
+      ;;(println "Local secondaries are " secondaries)
       (is (not (nil? (re-matches #"localhost:2701[7-9]" primary))))
       (is (not (some #{primary} secondaries)))
-      (is  (= (count secondaries) 4)))))
+      (is (= (count secondaries) 4)))))
 
 
 (deftest test-rs-member-retrieval
@@ -123,5 +120,5 @@
   (testing "Test that the simulate-maintenance function correct does a rolling restart"
     (let [num-mongods (num-active-rs-members "mongodb://localhost:27017")]
       (simulate-maintenance "mongodb://localhost:27017")
-      (Thread/sleep 5000)
+      (Thread/sleep 15000)
       (is (= (num-active-rs-members "mongodb://localhost:27017") num-mongods)))))

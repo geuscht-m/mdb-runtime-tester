@@ -30,6 +30,7 @@
 
 (defn make-mongo-uri
   [^String hostinfo]
+  (println "make-mongo-uri " hostinfo)
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
@@ -92,8 +93,8 @@
   ([uri]
    (let [conn       (md/mdb-connect uri)
          shard-list (md/mdb-admin-command conn { :listShards 1 })]
-     (md/mdb-disconnect conn)
-     shard-list))
+    (md/mdb-disconnect conn)
+   shard-list))
   ([uri ^String username ^String password]
    (let [conn       (md/mdb-connect uri username password)
          shard-list (md/mdb-admin-command conn { :listShards 1 })]

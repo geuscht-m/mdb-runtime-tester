@@ -15,7 +15,8 @@
   (control-sharded-cluster "start")
   (Thread/sleep 15000)
   (f)
-  (control-sharded-cluster "stop"))
+  (control-sharded-cluster "stop")
+  (Thread/sleep 3000))
 
 (use-fixtures :each wrap-sharded-tests)
 
@@ -61,9 +62,10 @@
           ;;shard-list  (get-shard-uris cluster-uri)
           restart     (make-sharded-cluster-degraded cluster-uri)]
       (Thread/sleep 11000)
+      (is (not-empty restart))
       (is (cluster-degraded? cluster-uri))
       (doall restart)
-      (Thread/sleep 3000)
+      (Thread/sleep 15000)
       (is (not (cluster-degraded? cluster-uri)))
     )))
 
@@ -82,10 +84,12 @@
   (testing "Check that we can turn all shards in a cluster read only"
     (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
           shard-list (get-shard-uris "mongodb://localhost:27017")]
-      ;;(println "\n" shard-list)
+      ;;(println "\nHigh level shard list " shard-list)
+      ;;(println "Is shard-list a seq " (seq? shard-list) "\n")
       (Thread/sleep 15000)
       (is (shards-read-only? shard-list))
       (doall restart)
-      (Thread/sleep 12000)
+      (Thread/sleep 17000)
+      ;;(println "\nHigh level shard list, again " shard-list)      
       (is (not (shards-read-only? shard-list)))
     )))
