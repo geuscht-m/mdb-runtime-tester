@@ -11,13 +11,31 @@
   (let [homedir (System/getenv "HOME")]
     (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica"))))
 
+(defn- wait-test-rs-ready
+  "Waits until the replica set is ready for testing so we don't
+   have to play with timeouts all the time"
+  []
+  ;;(def retries 0)
+  (let [rs-uri  "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000"
+        retries (atom 0)]
+    (while (and (< (num-active-rs-members rs-uri) 5) (< @retries 15))
+      (reset! retries (inc @retries))
+      (Thread/sleep 500)
+      ;;(println "checking again")
+      )
+    ;;(println "Test RS ready\n")
+    (< @retries 15)))
+
 (defn- wrap-rs-tests
   [f]
   (control-test-rs "start")
-  (Thread/sleep 10000) ;; Let the RS stablize
-  (f)
+  (Thread/sleep 500)
+  (if (wait-test-rs-ready)
+    (f)
+    (println "Test replica set not ready in time"))
   (control-test-rs "stop")
-  (Thread/sleep 3000))    ;; Give the shutdown some time to work before triggering the next setup
+  (Thread/sleep 3000) ;; Give the shutdown some time to work before triggering the next setup
+  ) 
 
 (use-fixtures :each wrap-rs-tests)
 

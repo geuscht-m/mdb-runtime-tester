@@ -11,10 +11,28 @@
   (let [homedir (System/getenv "HOME")]
     (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/sharded"))))
 
+(defn- wait-test-cluster-ready
+  "Waits until the replica sets for the cluster are ready for testing so we don't
+   have to play with timeouts all the time"
+  []
+  (let [shard-1 "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"
+        shard-2 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
+        shard-3 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03"
+        retries (atom 0)]
+    (while (and (or (< (num-active-rs-members shard-1) 3) (< (num-active-rs-members shard-2) 3) (< (num-active-rs-members shard-3) 3)) (< @retries 15))
+      (reset! retries (inc @retries))
+      (Thread/sleep 500)
+      ;;(println "checking again")
+      )
+    (println "Test cluster ready\n")
+    (< @retries 15)))
+
 (defn wrap-sharded-tests [f]
   (control-sharded-cluster "start")
-  (Thread/sleep 15000)
-  (f)
+  (Thread/sleep 500)
+  (if (wait-test-cluster-ready)
+    (f)
+    (println "Test sharded cluster readiness timed out"))
   (control-sharded-cluster "stop")
   (Thread/sleep 3000))
 
