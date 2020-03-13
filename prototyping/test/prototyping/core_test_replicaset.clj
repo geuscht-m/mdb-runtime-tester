@@ -18,12 +18,12 @@
   ;;(def retries 0)
   (let [rs-uri  "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000"
         retries (atom 0)]
-    (while (and (< (num-active-rs-members rs-uri) 5) (< @retries 15))
+    (while (and (not (replicaset-ready? rs-uri 5)) (< @retries 15))
       (reset! retries (inc @retries))
       (Thread/sleep 500)
       ;;(println "checking again")
       )
-    ;;(println "Test RS ready\n")
+    (println "Test RS ready\n")
     (< @retries 15)))
 
 (defn- wrap-rs-tests
@@ -58,7 +58,7 @@
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
       ;;(println "Local primary is " primary)
       ;;(println "Local secondaries are " secondaries)
-      (is (not (nil? (re-matches #"localhost:2701[7-9]" primary))))
+      (is (some? (re-matches #"localhost:270[12][127-9]" primary)))
       (is (not (some #{primary} secondaries)))
       (is (= (count secondaries) 4)))))
 

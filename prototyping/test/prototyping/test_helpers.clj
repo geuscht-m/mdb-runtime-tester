@@ -41,7 +41,10 @@
      ;;(println "degraded is " (some identity degraded) "\n")
      (some identity degraded))))
      
-
+(defn replicaset-ready?
+  "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
+  [rs-uri num-nodes]
+  (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
 
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"

@@ -19,7 +19,7 @@
         shard-2 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
         shard-3 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03"
         retries (atom 0)]
-    (while (and (or (< (num-active-rs-members shard-1) 3) (< (num-active-rs-members shard-2) 3) (< (num-active-rs-members shard-3) 3)) (< @retries 15))
+    (while (and (or (not (replicaset-ready shard-1 3)) (not (replicaset-ready? shard-2 3)) (not (replicaset-ready? shard-3 3))) (< @retries 15))
       (reset! retries (inc @retries))
       (Thread/sleep 500)
       ;;(println "checking again")
