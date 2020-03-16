@@ -15,16 +15,23 @@
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
   []
-  ;;(def retries 0)
   (let [rs-uri  "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000"
         retries (atom 0)]
-    (while (and (not (replicaset-ready? rs-uri 5)) (< @retries 15))
+    (while (and (not (replicaset-ready? rs-uri 5)) (< @retries 17))
       (reset! retries (inc @retries))
-      (Thread/sleep 500)
+      (Thread/sleep 1100)
       ;;(println "checking again")
       )
-    (println "Test RS ready\n")
-    (< @retries 15)))
+    ;;(println "Test RS ready\n")
+    (println "Needed " @retries " retries")
+    (< @retries 17)))
+
+(defn- wait-mongod-shutdown
+  "Wait until we have no further MongoDB processes running"
+  []
+  (while (> (num-running-mongo-processes) 0)
+    (println "Waiting for test processes to shut down")
+    (Thread/sleep 500)))
 
 (defn- wrap-rs-tests
   [f]
@@ -34,7 +41,8 @@
     (f)
     (println "Test replica set not ready in time"))
   (control-test-rs "stop")
-  (Thread/sleep 3000) ;; Give the shutdown some time to work before triggering the next setup
+  ;;(Thread/sleep 3000) ;; Give the shutdown some time to work before triggering the next setup
+  (wait-mongod-shutdown)
   ) 
 
 (use-fixtures :each wrap-rs-tests)
@@ -56,9 +64,9 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
-      ;;(println "Local primary is " primary)
+      (println "Local primary is " primary)
       ;;(println "Local secondaries are " secondaries)
-      (is (some? (re-matches #"localhost:270[12][127-9]" primary)))
+      (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
       (is (not (some #{primary} secondaries)))
       (is (= (count secondaries) 4)))))
 

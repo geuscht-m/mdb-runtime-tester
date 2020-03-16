@@ -8,6 +8,12 @@
   []
   (filter (fn [entry] (re-find #"^mongod\s+" (get entry :command-line))) (get-process-list)))
 
+(defn num-running-mongo-processes
+  "Figure out how many mongodb process (mongos or mongod) are currently running"
+  []
+  (let [processes (get-process-list)]
+    (count (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes))))
+
 (defn mongodb-port-list
   "Given a process list, retrieve the list of mongod/mongos port numbers of active
    processes"
@@ -50,10 +56,12 @@
   "Check if the replica set is read only (ie, has no primary)"
   ([rs-uri]
    (println "Trying to get primary for URI " rs-uri)
-   (let [primary (get-rs-primary rs-uri (ReadPreference/primaryPreferred))]
-     ;;replset     (run-replset-get-status mongo-uri user pw)]
-     ;;(println "\nget-rs-primary returned " primary "\n")
-     ;;(println "\nget-replset-status returned " (get replset :members) "\n")
+   (let [;;primary (get-rs-primary rs-uri (ReadPreference/primaryPreferred))
+         replset (run-replset-get-status rs-uri (ReadPreference/primaryPreferred))
+         primary (filter #(= (get % :stateStr) "PRIMARY") (get replset :members))]
+     (println "\nget-rs-primary for replica set " rs-uri " returned " primary "\n")
+     ;;(println "\nget-replset-status for replica set " rs-uri " returned " (get replset :members) "\n")
+     (println "\nget-replset-status for replica set " rs-uri " returned " replset "\n")
      (nil? primary)))
   ([rs-uri ^String user ^String pw]
    (let [mongo-uri   (make-mongo-uri rs-uri)
@@ -91,7 +99,7 @@
   "Check if all shards of a sharded cluster are read only."
   [uri]
   (if (seq? uri)
-    (and (map #(replica-set-read-only? %) uri))
+    (and (doall (map #(replica-set-read-only? %) uri)))
     (let [shards (get-shard-uris uri)]
       ;;(println "\nShards: " shards "\n")
       (and (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards)))))
