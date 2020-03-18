@@ -28,11 +28,11 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" "admin" "pw99") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" "admin" "pw99")))]
-      (println primary)
-      (println secondaries)
-      (not (nil? (re-matches #"mongodb://rs[1-3].mongodb.test" primary)))
-      (not (some #{primary} secondaries))
-      (is  (= (count secondaries) 2)))))
+      (println "Remote primary is " primary)
+      (println "Remote secondaries are " secondaries)
+      (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
+      (is (not (some #{primary} secondaries)))
+      (is (= (count secondaries) 2)))))
 
 (deftest test-remote-rs-kill-single
   (testing "Make sure we can shut down and restart a random remote replica set member"

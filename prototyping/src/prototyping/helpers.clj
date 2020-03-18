@@ -30,31 +30,32 @@
 
 (defn make-mongo-uri
   [^String hostinfo]
+  ;;(println "make-mongo-uri " hostinfo)
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
 
 ;; URI parsing helper
-(defn- parse-mongodb-uri
-  "Parses a mongodb URI and returns a map with :host, :port set
-   TODO: Needs auth support"
-  [uri]
-  ;; Check if we're dealing with a list of servers first, because we'll have to split the URL in that case  
-  (if (str/includes? uri ",")
-    (let [parse-match (re-matches #"mongodb://.+/(.+)" uri)
-          hosts       (str/split (nth parse-match 1) #",")]
-      ;;(println "\nParse-match " parse-match)
-      ;;(println "\nParsing host list " hosts "\n\n")
-      (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))
-                         host     (urly/host-of parsed-u)
-                         port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
-                     (ServerAddress. host port)) hosts)))
-    (let [parsed-u (urly/url-like uri)
-          host     (urly/host-of parsed-u)
-          port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
-      (if (= (urly/protocol-of parsed-u) "mongodb")
-        { :host host :port port }
-        { :host "" :port 9999 }))))
+;; (defn- parse-mongodb-uri
+;;   "Parses a mongodb URI and returns a map with :host, :port set
+;;    TODO: Needs auth support"
+;;   [uri]
+;;   ;; Check if we're dealing with a list of servers first, because we'll have to split the URL in that case  
+;;   (if (str/includes? uri ",")
+;;     (let [parse-match (re-matches #"mongodb://.+/(.+)" uri)
+;;           hosts       (str/split (nth parse-match 1) #",")]
+;;       ;;(println "\nParse-match " parse-match)
+;;       ;;(println "\nParsing host list " hosts "\n\n")
+;;       (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))
+;;                          host     (urly/host-of parsed-u)
+;;                          port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
+;;                      (ServerAddress. host port)) hosts)))
+;;     (let [parsed-u (urly/url-like uri)
+;;           host     (urly/host-of parsed-u)
+;;           port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
+;;       (if (= (urly/protocol-of parsed-u) "mongodb")
+;;         { :host host :port port }
+;;         { :host "" :port 9999 }))))
 
 ;;
 ;; A bunch of mongodb driver interface helpers
@@ -76,7 +77,7 @@
 ;;      cmd-result)))
 (defn- run-serverstatus
   ([uri]
-   (println "Trying to run server status on " uri "\n")
+   ;;(println "Trying to run server status on " uri "\n")
    (let [conn (md/mdb-connect uri)
          server-status (md/mdb-admin-command conn { :serverStatus 1 })]
      (md/mdb-disconnect conn)
@@ -92,8 +93,8 @@
   ([uri]
    (let [conn       (md/mdb-connect uri)
          shard-list (md/mdb-admin-command conn { :listShards 1 })]
-     (md/mdb-disconnect conn)
-     shard-list))
+    (md/mdb-disconnect conn)
+   shard-list))
   ([uri ^String username ^String password]
    (let [conn       (md/mdb-connect uri username password)
          shard-list (md/mdb-admin-command conn { :listShards 1 })]
@@ -107,9 +108,19 @@
         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
     (md/mdb-disconnect conn)
     replset-config))
+  ([uri ^ReadPreference rp]
+   (let [conn          (md/mdb-connect uri)
+        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } rp)]
+    (md/mdb-disconnect conn)
+    replset-config))
   ([uri ^String username ^String password]
    (let [conn           (md/mdb-connect uri username password)
          replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
+     (md/mdb-disconnect conn)
+     replset-config))
+  ([uri ^String username ^String password ^ReadPreference rp]
+   (let [conn           (md/mdb-connect uri username password)
+         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } rp)]
      (md/mdb-disconnect conn)
      replset-config)))
 
@@ -188,7 +199,7 @@
 (defn- run-remote-ssh-command
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
-  (println "\nAttempting to run ssh command " cmdline "\n")
+  ;;(println "\nAttempting to run ssh command " cmdline "\n")
   (let [agent   (ssh/ssh-agent {})
         session (ssh/session agent server {:strict-host-key-checking :no})]
     (ssh/with-connection session
@@ -197,10 +208,7 @@
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
-  ;;([conn-info]
-  ;; (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true)))
   [^MongoClient conn]
-  (println conn)
   (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
 
 (defn- run-server-status
@@ -247,8 +255,12 @@
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   ([uri]
    (get-rs-members-by-state uri "SECONDARY"))
+  ([uri ^ReadPreference rp]
+   (get-rs-members-by-state uri "SECONDARY" rp))
   ([uri ^String user ^String pw]
-   (get-rs-members-by-state uri "SECONDARY" user pw)))
+   (get-rs-members-by-state uri "SECONDARY" user pw))
+  ([uri ^String user ^String pw ^ReadPreference rp]
+   (get-rs-members-by-state uri "SECONDARY" user pw rp)))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"

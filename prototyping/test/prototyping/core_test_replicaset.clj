@@ -5,25 +5,46 @@
             [prototyping.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
-(defn- start-test-rs
-  []
-  ;;(println (System/getenv "PATH"))
+(defn- control-test-rs
+  "Controls test replica set start/stop using mlaunch"
+  [cmd]
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "start" "--dir" (str homedir "/tmp/mdb-test/replica"))))
+    (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica"))))
 
-(defn- stop-test-rs
+(defn- wait-test-rs-ready
+  "Waits until the replica set is ready for testing so we don't
+   have to play with timeouts all the time"
   []
-  (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" "stop" "--dir" (str homedir "/tmp/mdb-test/replica"))))
+  (let [rs-uri  "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000"
+        retries (atom 0)]
+    (while (and (not (replicaset-ready? rs-uri 5)) (< @retries 17))
+      (reset! retries (inc @retries))
+      (Thread/sleep 1100)
+      ;;(println "checking again")
+      )
+    ;;(println "Test RS ready\n")
+    ;;(println "Needed " @retries " retries")
+    (< @retries 17)))
+
+(defn- wait-mongod-shutdown
+  "Wait until we have no further MongoDB processes running"
+  []
+  (while (> (num-running-mongo-processes) 0)
+    ;;(println "Waiting for test processes to shut down")
+    (Thread/sleep 500)))
 
 (defn- wrap-rs-tests
   [f]
-  (start-test-rs)
-  (Thread/sleep 10000) ;; Let the RS stablize
-  (f)
-  (stop-test-rs))
+  (control-test-rs "start")
+  (Thread/sleep 500)
+  (if (wait-test-rs-ready)
+    (f)
+    (println "Test replica set not ready in time"))
+  (control-test-rs "stop")
+  (wait-mongod-shutdown)) 
 
 (use-fixtures :each wrap-rs-tests)
+
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
@@ -41,11 +62,11 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
-      (println primary)
-      (println secondaries)
-      (not (nil? (re-matches #"mongodb://localhost:2701[7-9]" primary)))
-      (not (some #{primary} secondaries))
-      (is  (= (count secondaries) 4)))))
+      (println "Local primary is " primary)
+      ;;(println "Local secondaries are " secondaries)
+      (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
+      (is (not (some #{primary} secondaries)))
+      (is (= (count secondaries) 4)))))
 
 
 (deftest test-rs-member-retrieval
@@ -67,29 +88,33 @@
 
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping a minority of nodes"
-    (let [restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
-      (not (nil? restart-cmd))
+    (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+          restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
+      (is (not (nil? restart-cmd)))
       ;; NOTE: Unfortunately this test is rather timing sensitive at the moment,
       ;;       hence the various sleeps
-      (Thread/sleep 30000)
-      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 3))
-      (Thread/sleep 1000)
+      (Thread/sleep 12000)
+      (is (replicaset-degraded? rs-uri))
+      (is (= (num-active-rs-members rs-uri) 3))
       (restart-cmd)
-      (Thread/sleep 5000)
-      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 5)))))
+      (Thread/sleep 7000)
+      (is (not (replicaset-degraded? rs-uri)))
+      (is (= (num-active-rs-members rs-uri) 5)))))
 
 (deftest test-read-only-rs
   (testing "Check that we are able to successfully make a replica set read only
             and restore it afterwards"
-    (let [restart-cmd (make-rs-read-only "mongodb://localhost:27017")]
+    (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+          restart-cmd (make-rs-read-only "mongodb://localhost:27017")]
       (is (not (nil? restart-cmd)))
-      (Thread/sleep 20000)
-      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 2))
-      (is (replica-set-read-only? (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))))
-      (Thread/sleep 1000)
+      (Thread/sleep 22000)
+      (is (replica-set-read-only? rs-uri))
+      (is (= (num-active-rs-members rs-uri) 2))
+      (is (replica-set-read-only? rs-uri))
       (restart-cmd)
-      (Thread/sleep 5000)
-      (is (= (num-active-rs-members (str "mongodb://localhost:" (first (mongodb-port-list (available-mongods))))) 5))
+      (Thread/sleep 12000)
+      (is (= (num-active-rs-members rs-uri) 5))
+      (is (not (replica-set-read-only? rs-uri)))
       )))
 
 (deftest test-kill-mongo-process
@@ -97,10 +122,10 @@
             mongo command"
     (let [cmdline (kill-mongo-process "mongodb://localhost:27017")]
       (is (not (nil? cmdline)))
-      (Thread/sleep 15000)
+      (Thread/sleep 12000)
       (is (= (num-active-rs-members "mongodb://localhost:27018") 4))
       (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
-      (Thread/sleep 5000)
+      (Thread/sleep 7000)
       (is (= (num-active-rs-members "mongodb://localhost:27018") 5))
       )))
 
@@ -119,5 +144,5 @@
   (testing "Test that the simulate-maintenance function correct does a rolling restart"
     (let [num-mongods (num-active-rs-members "mongodb://localhost:27017")]
       (simulate-maintenance "mongodb://localhost:27017")
-      (Thread/sleep 5000)
+      (Thread/sleep 15000)
       (is (= (num-active-rs-members "mongodb://localhost:27017") num-mongods)))))
