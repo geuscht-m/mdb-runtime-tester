@@ -72,7 +72,7 @@
     replset-config))
   ([uri ^ReadPreference rp]
    (let [conn          (md/mdb-connect uri)
-        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } rp)]
+        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } :readPreference rp)]
     (md/mdb-disconnect conn)
     replset-config))
   ([uri ^String username ^String password]
@@ -82,7 +82,7 @@
      replset-config))
   ([uri ^String username ^String password ^ReadPreference rp]
    (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } rp)]
+         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } :readPreference rp)]
      (md/mdb-disconnect conn)
      replset-config)))
 
@@ -90,22 +90,22 @@
   "Returns the result of Mongodb's replSetGetStatus admin command"
   ([uri]
    (let [conn           (md/mdb-connect uri)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference (ReadPreference/primaryPreferred))]
      (md/mdb-disconnect conn)
      replset-status))
   ([uri ^ReadPreference rp]
    (let [conn           (md/mdb-connect uri)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference rp)]
      (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password]
    (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference (ReadPreference/primaryPreferred))]
      (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password ^ReadPreference rp]
    (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference rp)]
      (md/mdb-disconnect conn)
      replset-status)))
 
