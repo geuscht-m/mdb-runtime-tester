@@ -23,14 +23,14 @@
       ;;(println "checking again")
       )
     ;;(println "Test RS ready\n")
-    (println "Needed " @retries " retries")
+    ;;(println "Needed " @retries " retries")
     (< @retries 17)))
 
 (defn- wait-mongod-shutdown
   "Wait until we have no further MongoDB processes running"
   []
   (while (> (num-running-mongo-processes) 0)
-    (println "Waiting for test processes to shut down")
+    ;;(println "Waiting for test processes to shut down")
     (Thread/sleep 500)))
 
 (defn- wrap-rs-tests
@@ -41,9 +41,7 @@
     (f)
     (println "Test replica set not ready in time"))
   (control-test-rs "stop")
-  ;;(Thread/sleep 3000) ;; Give the shutdown some time to work before triggering the next setup
-  (wait-mongod-shutdown)
-  ) 
+  (wait-mongod-shutdown)) 
 
 (use-fixtures :each wrap-rs-tests)
 

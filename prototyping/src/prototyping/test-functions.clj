@@ -62,7 +62,7 @@
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
   ([rs-uri]
-   (println "\nMaking replica set read only " rs-uri "\n")
+   ;;(println "\nMaking replica set read only " rs-uri "\n")
    (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
   ([rs-uri ^String user ^String pw]
    ;;(println "\nMaking replica set read only " rs-uri "\n")

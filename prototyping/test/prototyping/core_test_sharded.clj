@@ -23,14 +23,14 @@
     (while (and (not (and (replicaset-ready? shard-1 3) (replicaset-ready? shard-2 3) (replicaset-ready? shard-3 3))) (< @retries 19))
       (reset! retries (inc @retries))
       (Thread/sleep 500))
-    (println "Test cluster ready, took " @retries " retries")
+    ;;(println "Test cluster ready, took " @retries " retries")
     (< @retries 19)))
 
 (defn- wait-mongo-shutdown
   "Wait until we have no further MongoDB processes running"
   []
   (while (> (num-running-mongo-processes) 0)
-    (println "Waiting for test processes to shut down")
+    ;;(println "Waiting for test processes to shut down")
     (Thread/sleep 500)))
 
 (defn wrap-sharded-tests [f]
@@ -116,7 +116,7 @@
       (Thread/sleep 15000)
       ;;(println "shards-read-only? first invocation is " (shards-read-only? shard-list))
       (is (shards-read-only? shard-list))
-      (println "Restart is " restart)
+      ;;y(println "Restart is " restart)
       (doseq [r restart] (r))
       (Thread/sleep 32000)
       ;;(println "\nHigh level shard list, again " shard-list)
