@@ -35,46 +35,8 @@
     hostinfo
     (str "mongodb://" hostinfo)))
 
-;; URI parsing helper
-;; (defn- parse-mongodb-uri
-;;   "Parses a mongodb URI and returns a map with :host, :port set
-;;    TODO: Needs auth support"
-;;   [uri]
-;;   ;; Check if we're dealing with a list of servers first, because we'll have to split the URL in that case  
-;;   (if (str/includes? uri ",")
-;;     (let [parse-match (re-matches #"mongodb://.+/(.+)" uri)
-;;           hosts       (str/split (nth parse-match 1) #",")]
-;;       ;;(println "\nParse-match " parse-match)
-;;       ;;(println "\nParsing host list " hosts "\n\n")
-;;       (doall (map #(let [parsed-u (urly/url-like (make-mongo-uri % ))
-;;                          host     (urly/host-of parsed-u)
-;;                          port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
-;;                      (ServerAddress. host port)) hosts)))
-;;     (let [parsed-u (urly/url-like uri)
-;;           host     (urly/host-of parsed-u)
-;;           port     (if (= (urly/port-of parsed-u) -1) 27017 (urly/port-of parsed-u))]
-;;       (if (= (urly/protocol-of parsed-u) "mongodb")
-;;         { :host host :port port }
-;;         { :host "" :port 9999 }))))
+;; Local helper functions, not exposed to other namespaces
 
-;;
-;; A bunch of mongodb driver interface helpers
-;;
-;; (defn- run-cmd
-;;   "Run a command, either on an existing connection or create a connection to run the command
-;;    If the type of conn-info is a String, assume URI, otherwise assume MongoClient"
-;;   ([conn-info cmd]
-;;    (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info)) conn-info)
-;;          cmd-result (mcmd/admin-command connection cmd)]
-;;      (when (= (type conn-info) String)
-;;        (mg/disconnect connection))
-;;      cmd-result))
-;;   ([conn-info cmd ^String username ^String password]
-;;    (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info) username password) conn-info)
-;;          cmd-result (mcmd/admin-command connection cmd)]
-;;      (when (= (type conn-info) String)
-;;        (mg/disconnect connection))
-;;      cmd-result)))
 (defn- run-serverstatus
   ([uri]
    ;;(println "Trying to run server status on " uri "\n")
@@ -83,7 +45,7 @@
      (md/mdb-disconnect conn)
      server-status))
   ([uri ^String username ^String password]
-   (let [conn (md/mdb-connect uri username password)
+   (let [conn (md/mdb-connect uri :user username :pwd password)
          server-status (md/mdb-admin-command conn { :serverStatus 1 })]
      (md/mdb-disconnect conn)
      server-status)))
@@ -96,7 +58,7 @@
     (md/mdb-disconnect conn)
    shard-list))
   ([uri ^String username ^String password]
-   (let [conn       (md/mdb-connect uri username password)
+   (let [conn       (md/mdb-connect uri :user username :pwd password)
          shard-list (md/mdb-admin-command conn { :listShards 1 })]
      (md/mdb-disconnect conn)
      shard-list)))
@@ -114,12 +76,12 @@
     (md/mdb-disconnect conn)
     replset-config))
   ([uri ^String username ^String password]
-   (let [conn           (md/mdb-connect uri username password)
+   (let [conn           (md/mdb-connect uri :user username :pwd password)
          replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
      (md/mdb-disconnect conn)
      replset-config))
   ([uri ^String username ^String password ^ReadPreference rp]
-   (let [conn           (md/mdb-connect uri username password)
+   (let [conn           (md/mdb-connect uri :user username :pwd password)
          replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } rp)]
      (md/mdb-disconnect conn)
      replset-config)))
@@ -137,12 +99,12 @@
      (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password]
-   (let [conn           (md/mdb-connect uri username password)
+   (let [conn           (md/mdb-connect uri :user username :pwd password)
          replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
      (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password ^ReadPreference rp]
-   (let [conn           (md/mdb-connect uri username password)
+   (let [conn           (md/mdb-connect uri :user username :pwd password)
          replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
      (md/mdb-disconnect conn)
      replset-status)))
@@ -166,7 +128,7 @@
         ;;(println "Connection closed")
         (md/mdb-disconnect conn)))))
   ([uri ^String username ^String password]
-   (let [conn (md/mdb-connect uri username password)]
+   (let [conn (md/mdb-connect uri :user username :pwd password)]
      (try
        (md/mdb-admin-command conn { :replSetStepDown 120 })
        (catch com.mongodb.MongoSocketReadException e
@@ -362,13 +324,13 @@
      (md/mdb-disconnect conn)
      cmdline))
   ([uri ^String username ^String password]
-   (let [conn    (md/mdb-connect uri username password)
+   (let [conn    (md/mdb-connect uri :user username :pwd password)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn)
      (md/mdb-disconnect conn)
      cmdline))
   ([uri force ^String username ^String password]
-   (let [conn (md/mdb-connect uri username password)
+   (let [conn (md/mdb-connect uri :user username :pwd password)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
      (md/mdb-disconnect conn)
@@ -403,7 +365,7 @@
      (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
      cmd-line))
   ([uri force ^String user ^String pw]
-   (let [conn          (md/mdb-connect uri user pw)
+   (let [conn          (md/mdb-connect uri :user user :pwd pw)
          cmd-line      (run-server-get-cmd-line-opts conn)
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
