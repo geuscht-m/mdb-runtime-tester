@@ -29,14 +29,14 @@
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
   ([rs-uri member-num]
-   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num)))
+   (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num)))
          restart-info (doall (map stop-mongo-process stop-members))]
      ;;(println "\nRestart info" restart-info)
      (fn [] (if (seq? restart-info)
               (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
               (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
   ([rs-uri member-num ^String user ^String password]
-   (let [stop-members (doall (map #(get % :name) (get-random-members rs-uri member-num user password)))
+   (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num user password)))
          restart-info (doall (map #(stop-mongo-process % user password) stop-members))]
      ;;(println "\nRestart info" restart-info)
      (fn [] (if (seq? restart-info)

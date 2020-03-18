@@ -2,17 +2,15 @@
 
 (in-ns 'prototyping.core)
 (require '[clojure.string :as str]
-         '[monger.core :as mg]
-         '[monger.command :as mcmd]
-         '[monger.conversion :as mcv]
-         '[monger.credentials :as mcr]
          '[prototyping.conv-helpers :as pcv]
+         '[prototyping.mini-driver :as md]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[net.n01se.clojure-jna  :as jna]
          '[clj-ssh.ssh :as ssh])
 (import  [java.lang ProcessBuilder]
-         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference])
+         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference]
+         [com.mongodb.client MongoClient])
 
 (defn- get-hostname
   []
@@ -31,25 +29,10 @@
 ;; Generally available helper functions
 
 (defn make-mongo-uri
-  [hostinfo]
+  [^String hostinfo]
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
-
-(defn- connect-wrapper
-  ([conn-info]
-   (let [connection-info (if (map? conn-info) (ServerAddress. (get conn-info :host) (get conn-info :port)) conn-info)
-         options         (.build (.readPreference (MongoClientOptions$Builder.) (ReadPreference/primaryPreferred)))]
-     ;;(println "\nCreating connection with primaryPreferred read pref\n\n")
-     (mg/connect connection-info options)))
-  ([conn-info ^String username ^String password]
-   (let [connection-info (if (map? conn-info) (ServerAddress. (get conn-info :host) (get conn-info :port)) conn-info)
-         options         (.build (.readPreference (MongoClientOptions$Builder.) (ReadPreference/primaryPreferred)))
-         cred            (mcr/create username "admin" password)]
-     ;;(println "\nCreating connection with primaryPreferred read pref\n\n")
-     (mg/connect connection-info options cred))))
- 
-
 
 ;; URI parsing helper
 (defn- parse-mongodb-uri
@@ -76,89 +59,109 @@
 ;;
 ;; A bunch of mongodb driver interface helpers
 ;;
-(defn- run-cmd
-  "Run a command, either on an existing connection or create a connection to run the command
-   If the type of conn-info is a String, assume URI, otherwise assume MongoClient"
-  ([conn-info cmd]
-   (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info)) conn-info)
-         cmd-result (mcmd/admin-command connection cmd)]
-     (when (= (type conn-info) String)
-       (mg/disconnect connection))
-     cmd-result))
-  ([conn-info cmd ^String username ^String password]
-   (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info) username password) conn-info)
-         cmd-result (mcmd/admin-command connection cmd)]
-     (when (= (type conn-info) String)
-       (mg/disconnect connection))
-     cmd-result)))
+;; (defn- run-cmd
+;;   "Run a command, either on an existing connection or create a connection to run the command
+;;    If the type of conn-info is a String, assume URI, otherwise assume MongoClient"
+;;   ([conn-info cmd]
+;;    (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info)) conn-info)
+;;          cmd-result (mcmd/admin-command connection cmd)]
+;;      (when (= (type conn-info) String)
+;;        (mg/disconnect connection))
+;;      cmd-result))
+;;   ([conn-info cmd ^String username ^String password]
+;;    (let [connection (if (= (type conn-info) String) (mg/connect (parse-mongodb-uri conn-info) username password) conn-info)
+;;          cmd-result (mcmd/admin-command connection cmd)]
+;;      (when (= (type conn-info) String)
+;;        (mg/disconnect connection))
+;;      cmd-result)))
+(defn- run-serverstatus
+  ([uri]
+   (println "Trying to run server status on " uri "\n")
+   (let [conn (md/mdb-connect uri)
+         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
+     (md/mdb-disconnect conn)
+     server-status))
+  ([uri ^String username ^String password]
+   (let [conn (md/mdb-connect uri username password)
+         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
+     (md/mdb-disconnect conn)
+     server-status)))
 
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   ([uri]
-   (let [conn (connect-wrapper (parse-mongodb-uri uri))
-         shard-list (mcv/from-db-object (mcmd/admin-command conn { :listShards 1 }) true)]
-     (mg/disconnect conn)
+   (let [conn       (md/mdb-connect uri)
+         shard-list (md/mdb-admin-command conn { :listShards 1 })]
+     (md/mdb-disconnect conn)
      shard-list))
   ([uri ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri uri) username password)
-         shard-list (admin-cmd conn { :listShards 1 })]
-     (mg/disconnect conn)
+   (let [conn       (md/mdb-connect uri username password)
+         shard-list (md/mdb-admin-command conn { :listShards 1 })]
+     (md/mdb-disconnect conn)
      shard-list)))
 
 (defn- run-replset-get-config
   "Returns the output of mongodb's replSetGetConfig admin command"
-  ([uri]
-   (let [conn           (connect-wrapper (parse-mongodb-uri uri))
-        replset-config (admin-cmd conn { :replSetGetConfig 1 })]
-    (mg/disconnect conn)
+  ([uri]   
+   (let [conn          (md/mdb-connect uri)
+        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
+    (md/mdb-disconnect conn)
     replset-config))
   ([uri ^String username ^String password]
-   (let [conn           (connect-wrapper (parse-mongodb-uri uri) username password)
-         replset-config (admin-cmd conn { :replSetGetConfig 1 })]
-     (mg/disconnect conn)
+   (let [conn           (md/mdb-connect uri username password)
+         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
+     (md/mdb-disconnect conn)
      replset-config)))
 
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
   ([uri]
-   (let [conn-info      (parse-mongodb-uri uri)
-         conn           (connect-wrapper conn-info)
-         replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
-     (mg/disconnect conn)
+   (let [conn           (md/mdb-connect uri)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+     (md/mdb-disconnect conn)
+     replset-status))
+  ([uri ^ReadPreference rp]
+   (let [conn           (md/mdb-connect uri)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
+     (md/mdb-disconnect conn)
      replset-status))
   ([uri ^String username ^String password]
-   (let [conn-info      (parse-mongodb-uri uri)
-         conn           (connect-wrapper conn-info username password)
-         replset-status (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document {:replSetGetStatus 1}) (ReadPreference/primaryPreferred)) true)]
-     (mg/disconnect conn)
+   (let [conn           (md/mdb-connect uri username password)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} (ReadPreference/primaryPreferred))]
+     (md/mdb-disconnect conn)
+     replset-status))
+  ([uri ^String username ^String password ^ReadPreference rp]
+   (let [conn           (md/mdb-connect uri username password)
+         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} rp)]
+     (md/mdb-disconnect conn)
      replset-status)))
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
   [uri]
-  (let [conn       (connect-wrapper (parse-mongodb-uri uri))
-        shard-map  (admin-cmd conn { :getShardMap 1 })]
-    (mg/disconnect conn)
+  (let [conn       (md/mdb-connect uri)
+        shard-map  (md/mdb-admin-command conn { :getShardMap 1 })]
+    (md/mdb-disconnect conn)
     shard-map))
 
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
   ([uri]
-   (let [conn (connect-wrapper (parse-mongodb-uri uri))]
+   (let [conn (md/mdb-connect uri)]
     (try
-      (mcv/from-db-object (mcmd/admin-command conn { :replSetStepDown 120 }) true)
+      (md/mdb-admin-command conn { :replSetStepDown 120 })
       (catch com.mongodb.MongoSocketReadException e
         ;;(println "Caught expected exception " e)))))
         ;;(println "Connection closed")
-        (mg/disconnect conn)))))
+        (md/mdb-disconnect conn)))))
   ([uri ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri uri) username password)]
+   (let [conn (md/mdb-connect uri username password)]
      (try
-       (mcv/from-db-object (mcmd/admin-command conn { :replSetStepDown 120 }) true)
+       (md/mdb-admin-command conn { :replSetStepDown 120 })
        (catch com.mongodb.MongoSocketReadException e
         ;;(println "Caught expected exception " e)))))
         ;;(println "Connection closed")
-         (mg/disconnect conn))))))
+         (md/mdb-disconnect conn))))))
 
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
@@ -167,7 +170,7 @@
   ;; NOTE: running shutdown will trigger an exception as the database
   ;;       connection will close. Catch and discard the exception here
   (try
-    (run-cmd conn-info { :shutdown 1 :force force })
+    (md/mdb-admin-command conn-info { :shutdown 1 :force force })
     (catch com.mongodb.MongoSocketReadException e
       (println "Exception caught as expected"))
     (catch java.lang.NullPointerException e
@@ -194,13 +197,16 @@
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
-  [conn-info]
-  (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true))
+  ;;([conn-info]
+  ;; (mcv/from-db-object (run-cmd conn-info { :getCmdLineOpts 1 }) true)))
+  [^MongoClient conn]
+  (println conn)
+  (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
 
 (defn- run-server-status
   "Run the serverStatus command and return the result as a map"
-  [conn-info]
-  (mcv/from-db-object (run-cmd conn-info { :serverStatus 1 }) true))
+  [^MongoClient conn]
+  (md/mdb-admin-command conn { :serverStatus 1 }))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
@@ -210,8 +216,16 @@
    (let [rs-state (run-replset-get-status uri)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state ^ReadPreference rp]
+   (let [rs-state (run-replset-get-status uri rp)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members))))
   ([uri state ^String user ^String pw]
    (let [rs-state (run-replset-get-status uri user pw)]
+     ;;(println rs-state "\n")
+     (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  ([uri state ^String user ^String pw ^ReadPreference rp]
+   (let [rs-state (run-replset-get-status uri user pw rp)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members)))))
 
@@ -220,9 +234,14 @@
   ([uri]
   ;;(println "\nTryin to get primary for replica set " uri "\n")
    (first (get-rs-members-by-state uri "PRIMARY")))
+  ([uri ^ReadPreference rp]
+   (first (get-rs-members-by-state uri "PRIMARY" rp)))
   ([uri ^String user ^String pw]
    ;;(println "\nTryin to get primary for replica set " uri "\n")
-   (first (get-rs-members-by-state uri "PRIMARY" user pw))))
+   (first (get-rs-members-by-state uri "PRIMARY" user pw)))
+  ([uri ^String user ^String pw ^ReadPreference rp]
+   (first (get-rs-members-by-state uri "PRIMARY" user pw rp))))
+
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -258,14 +277,10 @@
 
 (defn- get-process-type
   ([uri]
-   (let [conn (mg/connect (parse-mongodb-uri uri))
-         proc-type (get (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true) :process)]
-     (mg/disconnect conn)
+   (let [proc-type (get (run-serverstatus uri) :process)]
      proc-type))
   ([uri ^String user ^String pw]
-   (let [conn (connect-wrapper (parse-mongodb-uri uri) user pw)
-         proc-type (get (mcv/from-db-object (mcmd/server-status (mg/get-db conn "admin")) true) :process)]
-     (mg/disconnect conn)
+   (let [proc-type (get (run-serverstatus uri user pw) :process)]
      proc-type)))
   
 (defn check-process-type
@@ -323,28 +338,28 @@
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
   ([uri]
-   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn (md/mdb-connect (make-mongo-uri uri))
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline))
   ([uri force]
-   (let [conn (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn (md/mdb-connect (make-mongo-uri uri))
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline))
   ([uri ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+   (let [conn    (md/mdb-connect uri username password)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline))
   ([uri force ^String username ^String password]
-   (let [conn (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) username password)
+   (let [conn (md/mdb-connect uri username password)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn force)
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      cmdline)))
 
 (defn- kill-local-mongo-process-impl
@@ -352,11 +367,11 @@
      - force = false/nil - use SIGTERM for orderly shutdown
      - force = true      - use SIGKILL to simulate crash"
   ([uri force]
-   (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn          (md/mdb-connect uri)
          cmd-line      (run-server-get-cmd-line-opts conn)
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
-     (mg/disconnect conn)
+     (md/mdb-disconnect conn)
      (if force
        (jna/invoke Integer c/kill pid 9)
        (jna/invoke Integer c/kill pid 15))
@@ -368,21 +383,19 @@
    using the 'kill' command rather than talking to the C library
    directly"
   ([uri force]
-   (let [conn          (mg/connect (parse-mongodb-uri (make-mongo-uri uri)))
+   (let [conn          (md/mdb-connect uri)
          cmd-line      (run-server-get-cmd-line-opts conn)
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
-     (mg/disconnect conn)
-     ;; TODO: Add ssh code to run 'kill' on a remote box
+     (md/mdb-disconnect conn)
      (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
      cmd-line))
   ([uri force ^String user ^String pw]
-   (let [conn          (connect-wrapper (parse-mongodb-uri (make-mongo-uri uri)) user pw)
+   (let [conn          (md/mdb-connect uri user pw)
          cmd-line      (run-server-get-cmd-line-opts conn)
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
-     (mg/disconnect conn)
-     ;; TODO: Add ssh code to run 'kill' on a remote box
+     (md/mdb-disconnect conn)
      (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
      cmd-line)))
 
@@ -445,13 +458,20 @@
      ;;(println shard-map)
      (str/split (get (get shard-map :map) :config) #","))))
 
+(defn- convert-shard-uri
+  [from-list-shards]
+  (let [components (re-matches #"(.*)/(.*)" from-list-shards)]
+    (str "mongodb://" (get components 2) "/?replicaSet=" (get components 1))))
+
 (defn get-shard-uris
   "Retrieve the URIs for the individual shards that make up the sharded cluster.
-   cluster-uri _must_ point to the mongos for correct discovery."
+   cluster-uri _must_ point to the mongos for correct discovery.
+   Note that listShards returns the shard replsets in a different format
+   so we have to transform them before returning the list"
   ([cluster-uri]
   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
    (let [shard-configs (run-listshards cluster-uri)]
-     (map #(get % :host) (get shard-configs :shards))))
+     (map #(convert-shard-uri (get % :host)) (get shard-configs :shards))))
   ([cluster-uri ^String username ^String password]
    ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
    (let [shard-configs (run-listshards cluster-uri username password)]
@@ -466,9 +486,18 @@
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
   ([uri]
-   (not (empty? (get-shard-uris uri))))
+   (try
+     (let [shard-uris (get-shard-uris uri)] 
+       (not (empty? shard-uris)))
+     (catch com.mongodb.MongoCommandException e
+       ;; Note - add log output just in case
+       nil)))
   ([uri ^String user ^String pw]
-   (not (empty? (get-shard-uris uri user pw)))))
+   (try
+     (let [shard-uris (get-shard-uris uri user pw)]
+       (not (empty? shard-uris)))
+     (catch com.mongodb.MongoCommandException e
+       nil))))
 
 (defn undo-operation
   "On functions that return a closure, execute the closure"

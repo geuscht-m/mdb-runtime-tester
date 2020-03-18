@@ -1,6 +1,7 @@
 (ns prototyping.test-helpers
   (:require [prototyping.core :refer :all]
-            [prototyping.sys-helpers :refer :all]))
+            [prototyping.sys-helpers :refer :all])
+  (:import  [com.mongodb ReadPreference]))
 
 (defn available-mongods
   "Try to create a list of available mongods on the current machine"
@@ -42,14 +43,14 @@
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"
   ([rs-uri]
-   (let [primary (get-rs-primary (make-mongo-uri rs-uri))
+   (let [primary (get-rs-primary (make-mongo-uri rs-uri) (ReadPreference/primaryPreferred))
          replset (run-replset-get-status (make-mongo-uri rs-uri))]
      ;;(println "\nget-rs-primary returned " primary "\n")
      ;;(println "\nget-replset-status returned " (get replset :members) "\n")
      (nil? primary)))
   ([rs-uri ^String user ^String pw]
    (let [mongo-uri   (make-mongo-uri rs-uri)
-         primary     (get-rs-primary mongo-uri user pw)]
+         primary     (get-rs-primary mongo-uri user pw (ReadPreference/primaryPreferred))]
      ;;replset     (run-replset-get-status mongo-uri user pw)]
      ;;(println "\nget-rs-primary returned " primary "\n")
      ;;(println "\nget-replset-status returned " (get replset :members) "\n")

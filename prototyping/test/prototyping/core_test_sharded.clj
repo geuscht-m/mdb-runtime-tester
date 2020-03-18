@@ -40,7 +40,9 @@
 (deftest test-get-shard-uris
   (testing "Try to retrieve the shard URIs"
     (is (= (get-shard-uris "mongodb://localhost:27017")
-           (list "shard01/localhost:27018,localhost:27019,localhost:27020" "shard02/localhost:27021,localhost:27022,localhost:27023" "shard03/localhost:27024,localhost:27025,localhost:27026")))))
+           (list "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"
+                 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
+                 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03")))))
 
 (deftest test-is-sharded
   (testing "Are we connected to a sharded cluster"
@@ -48,7 +50,7 @@
 
 (deftest test-degraded-single-shard
   (testing "Check that we can create a degraded single shard with the minority of nodes on a single shard disabled"
-    (let [shard-uri "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"
+    (let [shard-uri "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"
           restart (make-shard-degraded shard-uri)]
       (Thread/sleep 11000)
       (is (shard-degraded? shard-uri))
@@ -71,12 +73,13 @@
 
 (deftest test-read-only-single-shard
   (testing "Check that we turn a single (first) shard on a cluster read only"
-    (let [restart  (make-shard-read-only "" "mongodb://localhost:27018")]
+    (let [restart   (make-shard-read-only "" "mongodb://localhost:27018")
+          shard-uri "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"]
       (Thread/sleep 15000)  ;; Ensure that the replica set has enough time for an election
-      (is (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+      (is (shard-read-only? shard-uri))
       (restart)
       (Thread/sleep 10000)
-      (not (shard-read-only? "mongodb://shard01/localhost:27018,localhost:27019,localhost:27020"))
+      (not (shard-read-only? shard-uri))
     )))
 
 (deftest test-read-only-complete-cluster
