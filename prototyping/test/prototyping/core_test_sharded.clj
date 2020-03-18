@@ -19,13 +19,19 @@
         shard-2 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
         shard-3 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03"
         retries (atom 0)]
-    (while (and (or (not (replicaset-ready? shard-1 3)) (not (replicaset-ready? shard-2 3)) (not (replicaset-ready? shard-3 3))) (< @retries 15))
+    (Thread/sleep 1100)
+    (while (and (not (and (replicaset-ready? shard-1 3) (replicaset-ready? shard-2 3) (replicaset-ready? shard-3 3))) (< @retries 19))
       (reset! retries (inc @retries))
-      (Thread/sleep 500)
-      ;;(println "checking again")
-      )
-    (println "Test cluster ready\n")
-    (< @retries 15)))
+      (Thread/sleep 500))
+    (println "Test cluster ready, took " @retries " retries")
+    (< @retries 19)))
+
+(defn- wait-mongo-shutdown
+  "Wait until we have no further MongoDB processes running"
+  []
+  (while (> (num-running-mongo-processes) 0)
+    (println "Waiting for test processes to shut down")
+    (Thread/sleep 500)))
 
 (defn wrap-sharded-tests [f]
   (control-sharded-cluster "start")
@@ -34,7 +40,7 @@
     (f)
     (println "Test sharded cluster readiness timed out"))
   (control-sharded-cluster "stop")
-  (Thread/sleep 3000))
+  (wait-mongo-shutdown))
 
 (use-fixtures :each wrap-sharded-tests)
 
@@ -70,7 +76,7 @@
       (Thread/sleep 11000)
       (is (shard-degraded? shard-uri))
       (restart)
-      (Thread/sleep 3000)
+      (Thread/sleep 4100)
       (is (not (shard-degraded? shard-uri)))
     )))
 
@@ -82,16 +88,18 @@
       (Thread/sleep 11000)
       (is (not-empty restart))
       (is (cluster-degraded? cluster-uri))
-      (doall restart)
+      ;;(println "Degraded restart is " restart)
+      (doseq [r restart] (r))
       (Thread/sleep 15000)
       (is (not (cluster-degraded? cluster-uri)))
     )))
 
 (deftest test-read-only-single-shard
   (testing "Check that we turn a single (first) shard on a cluster read only"
-    (let [restart   (make-shard-read-only "" "mongodb://localhost:27018")
+    (let [restart   (make-shard-read-only "mongodb://localhost:27018")
           shard-uri "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01"]
       (Thread/sleep 15000)  ;; Ensure that the replica set has enough time for an election
+      (is restart)
       (is (shard-read-only? shard-uri))
       (restart)
       (Thread/sleep 12000)
@@ -100,14 +108,18 @@
 
 (deftest test-read-only-complete-cluster
   (testing "Check that we can turn all shards in a cluster read only"
-    (let [restart    (make-sharded-cluster-read-only "mongodb://localhost:27017")
-          shard-list (get-shard-uris "mongodb://localhost:27017")]
+    (let [cluster-uri "mongodb://localhost:27017"
+          shard-list  (get-shard-uris cluster-uri)
+          restart     (make-sharded-cluster-read-only cluster-uri)]
       ;;(println "\nHigh level shard list " shard-list)
       ;;(println "Is shard-list a seq " (seq? shard-list) "\n")
       (Thread/sleep 15000)
+      ;;(println "shards-read-only? first invocation is " (shards-read-only? shard-list))
       (is (shards-read-only? shard-list))
-      (doall restart)
-      (Thread/sleep 17000)
-      ;;(println "\nHigh level shard list, again " shard-list)      
+      (println "Restart is " restart)
+      (doseq [r restart] (r))
+      (Thread/sleep 32000)
+      ;;(println "\nHigh level shard list, again " shard-list)
+      ;;(println "shards-read-only? is " (shards-read-only? shard-list))
       (is (not (shards-read-only? shard-list)))
     )))

@@ -30,7 +30,7 @@
 
 (defn make-mongo-uri
   [^String hostinfo]
-  (println "make-mongo-uri " hostinfo)
+  ;;(println "make-mongo-uri " hostinfo)
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))

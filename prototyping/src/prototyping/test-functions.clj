@@ -29,6 +29,7 @@
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
   ([rs-uri member-num]
+   ;;(println "Stopping " member-num " members of replica set " rs-uri)
    (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num)))
          restart-info (doall (map stop-mongo-process stop-members))]
      ;;(println "\nRestart info" restart-info)
@@ -61,7 +62,7 @@
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
   ([rs-uri]
-   ;;(println "\nMaking replica set read only " rs-uri "\n")
+   (println "\nMaking replica set read only " rs-uri "\n")
    (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
   ([rs-uri ^String user ^String pw]
    ;;(println "\nMaking replica set read only " rs-uri "\n")
@@ -75,7 +76,7 @@
 (defn make-shard-read-only
   "Make a single, defined shard on a sharded cluster read only.
    If you want to make a random shard read only, use the function make-random-shard-read-only"
-  [cluster-uri shard-uri]
+  [shard-uri]
   (make-rs-read-only shard-uri))
 
 (defn make-random-shard-read-only
@@ -94,13 +95,14 @@
   "Shut down the minority of nodes for each replica set on a sharded cluster"
   [cluster-uri]
   (let [shard-uris (get-shard-uris cluster-uri)]
-    (map #(make-shard-degraded (make-mongo-uri %)) shard-uris)))
+    (doall (map #(make-shard-degraded (make-mongo-uri %)) shard-uris))))
 
 (defn make-sharded-cluster-read-only
   "Shut down the majority of nodes for each replica set making up the sharded cluster. This leaves the sharded cluster read only"
   [cluster-uri]
   (let [shard-uris (get-shard-uris cluster-uri)]
-    (map make-shard-read-only "" shard-uris)))
+    ;;(println "Make shard uris " shard-uris " read only")
+    (doall (map make-shard-read-only shard-uris))))
 
 (defn trigger-initial-sync
   "Test the impact of an initial sync on your cluster.
