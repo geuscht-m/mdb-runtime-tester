@@ -28,7 +28,7 @@
    MongoDB understands"
   [shard-uri]
   (let [uri-parts (re-matches #"shard\d+/(.*)" shard-uri)]
-    (println uri-parts)
+    ;;(println "shard uri conversion - uri parts are " uri-parts)
     (if (not (nil? uri-parts))
       (make-mongo-uri (nth uri-parts 1))
       nil)))
@@ -43,7 +43,7 @@
      ;;(println "Degraded replica set members " degraded "\n")
      (some true? degraded)))
   ([rs-uri ^String user ^String pw]
-   (let [rs-status (get (run-replset-get-status rs-uri user pw) :members)
+   (let [rs-status (get (run-replset-get-status rs-uri :user user :password pw) :members)
          degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
      ;;(println "\nReplica set status is " rs-status)
      ;;(println "degraded is " (some identity degraded) "\n")
@@ -59,7 +59,7 @@
   ([rs-uri]
    ;;(println "Trying to get primary for URI " rs-uri)
    (let [;;primary (get-rs-primary rs-uri (ReadPreference/primaryPreferred))
-         replset (run-replset-get-status rs-uri (ReadPreference/primaryPreferred))
+         replset (run-replset-get-status rs-uri :read-preference (ReadPreference/primaryPreferred))
          primary (first (filter #(= (get % :stateStr) "PRIMARY") (get replset :members)))]
      ;;(println "\nget-rs-primary for replica set " rs-uri " returned " primary "\n")
      ;;(println "\nget-replset-status for replica set " rs-uri " returned " (get replset :members) "\n")

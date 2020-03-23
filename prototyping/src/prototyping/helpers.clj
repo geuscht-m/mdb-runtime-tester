@@ -4,27 +4,13 @@
 (require '[clojure.string :as str]
          '[prototyping.conv-helpers :as pcv]
          '[prototyping.mini-driver :as md]
+         '[prototyping.os-helpers :as os]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
-         '[net.n01se.clojure-jna  :as jna]
          '[clj-ssh.ssh :as ssh])
-(import  [java.lang ProcessBuilder]
-         [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference]
+(import  [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference]
          [com.mongodb.client MongoClient])
 
-(defn- get-hostname
-  []
-  (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
-
-(defn- admin-cmd
-  "Internal - run admin command using Java driver 3.x API with proper read concern"
-  [conn cmd]
-  (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document cmd)) true))
-
-(defn- admin-cmd-primary-pref
-  "Internal - run admin command using Java driver 3.x API with proper read concern"
-  [conn cmd]
-  (pcv/from-bson-document (.runCommand (.getDatabase conn "admin") (pcv/to-bson-document cmd) (ReadPreference/primaryPreferred)) true))
 
 ;; Generally available helper functions
 
@@ -40,12 +26,12 @@
 (defn- run-serverstatus
   ([uri]
    ;;(println "Trying to run server status on " uri "\n")
-   (let [conn (md/mdb-connect uri)
+   (let [conn          (md/mdb-connect uri)
          server-status (md/mdb-admin-command conn { :serverStatus 1 })]
      (md/mdb-disconnect conn)
      server-status))
   ([uri ^String username ^String password]
-   (let [conn (md/mdb-connect uri :user username :pwd password)
+   (let [conn          (md/mdb-connect uri :user username :pwd password)
          server-status (md/mdb-admin-command conn { :serverStatus 1 })]
      (md/mdb-disconnect conn)
      server-status)))
@@ -63,51 +49,13 @@
      (md/mdb-disconnect conn)
      shard-list)))
 
-(defn- run-replset-get-config
-  "Returns the output of mongodb's replSetGetConfig admin command"
-  ([uri]   
-   (let [conn          (md/mdb-connect uri)
-        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
-    (md/mdb-disconnect conn)
-    replset-config))
-  ([uri ^ReadPreference rp]
-   (let [conn          (md/mdb-connect uri)
-        replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } :readPreference rp)]
-    (md/mdb-disconnect conn)
-    replset-config))
-  ([uri ^String username ^String password]
-   (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 })]
-     (md/mdb-disconnect conn)
-     replset-config))
-  ([uri ^String username ^String password ^ReadPreference rp]
-   (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-config (md/mdb-admin-command conn { :replSetGetConfig 1 } :readPreference rp)]
-     (md/mdb-disconnect conn)
-     replset-config)))
-
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
-  ([uri]
-   (let [conn           (md/mdb-connect uri)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference (ReadPreference/primaryPreferred))]
-     (md/mdb-disconnect conn)
-     replset-status))
-  ([uri ^ReadPreference rp]
-   (let [conn           (md/mdb-connect uri)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference rp)]
-     (md/mdb-disconnect conn)
-     replset-status))
-  ([uri ^String username ^String password]
-   (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference (ReadPreference/primaryPreferred))]
-     (md/mdb-disconnect conn)
-     replset-status))
-  ([uri ^String username ^String password ^ReadPreference rp]
-   (let [conn           (md/mdb-connect uri :user username :pwd password)
-         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference rp)]
-     (md/mdb-disconnect conn)
-     replset-status)))
+  [uri & { :keys [ read-preference user password ] :or { read-preference (ReadPreference/primaryPreferred) user nil password nil } } ]
+  (let [conn           (md/mdb-connect uri :user user :pwd password)
+        replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
+    (md/mdb-disconnect conn)
+    replset-status))
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
@@ -191,11 +139,11 @@
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members))))
   ([uri state ^String user ^String pw]
-   (let [rs-state (run-replset-get-status uri user pw)]
+   (let [rs-state (run-replset-get-status uri :user user :password pw)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members))))
   ([uri state ^String user ^String pw ^ReadPreference rp]
-   (let [rs-state (run-replset-get-status uri user pw rp)]
+   (let [rs-state (run-replset-get-status uri :user user :password pw :read-preference rp)]
      ;;(println rs-state "\n")
      (filter #(= (get % :stateStr) state) (get rs-state :members)))))
 
@@ -229,7 +177,7 @@
   ([uri]
    (count (get (run-replset-get-status uri) :members)))
   ([uri ^String username ^String password]
-   (count (get (run-replset-get-status uri username password) :members))))
+   (count (get (run-replset-get-status uri :user username :password password) :members))))
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
@@ -238,7 +186,7 @@
          active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
      (count active-members)))
   ([uri ^String user ^String pw]
-   (let [members (get (run-replset-get-status uri user pw) :members)
+   (let [members (get (run-replset-get-status uri :user user :password pw) :members)
          active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
      (count active-members))))
 
@@ -246,7 +194,7 @@
   "Check if the mongo process referenced by the URI is local or not"
   [uri]
   (let [parsed-uri (urly/url-like (make-mongo-uri uri))
-        hostname   (get-hostname)]
+        hostname   (os/get-hostname)]
     (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
 
 (defn- get-process-type
@@ -281,14 +229,9 @@
   ([parameters ^String user ^String pw]
    (= (check-process-type parameters user pw) "mongos")))
 
-(defn- spawn-process
-  "Helper function that starts an external process"
-  [process-parameters]
-  (.waitFor (-> (ProcessBuilder. process-parameters) .inheritIO .start)))
-
 (defn start-local-mongo-process [uri process-settings]
   ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
-  (spawn-process process-settings))
+  (os/spawn-process process-settings))
 
 
 (defn- extract-server-name
@@ -346,9 +289,7 @@
          server-status (run-server-status conn)
          pid           (get server-status :pid)]
      (md/mdb-disconnect conn)
-     (if force
-       (jna/invoke Integer c/kill pid 9)
-       (jna/invoke Integer c/kill pid 15))
+     (os/kill-local-process pid force)
      cmd-line)))
 
 (defn- kill-remote-mongo-process-impl
@@ -408,7 +349,7 @@
     (take n (shuffle rs-members))))
   ([uri n ^String username ^String password]
    ;;(println "\nGetting random members for replset " uri "\n")
-   (let [rs-members (get (run-replset-get-status uri username password) :members)]
+   (let [rs-members (get (run-replset-get-status uri :user username :password password) :members)]
      ;;(println "\nWorking on member list " rs-members "\n")
      (take n (shuffle rs-members)))))
 
