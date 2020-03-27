@@ -1,13 +1,31 @@
+require 'fileutils'
+
 Vagrant.configure("2") do |config|
-#  config.vm.box = "centos/7"
+  # Generate the TLS certs if they don't exist yet
+  if ((not File.file?("tls/rs1/rs1.pem")) || (not File.file?("tls/rs2/rs2.pem")) || (not File.file?("tls/rs3/rs3.pem")) || (not File.file?("tls/testdriver/testdriver.pem")) || (not File.file?("tls/CA/root.crt")))
+    system("prep-tls-cert.sh")
+  end
+  
+  # Regen the ssh keys used to communicate between testdriver and rs[1-3] if we're in up or provision mode
+  if ARGV[0] == 'up' || ARGV[0] == 'provision'
+    if File.directory?("ssh")
+      FileUtils.rm_rf('ssh')
+    end
+    Dir.mkdir('ssh')
+    system('ssh-keygen -t ed25519 -f ssh/id_ed25519 -N ""')
+    insecure_ssh_pub_key = File.readlines('ssh/id_ed25519.pub').first.strip
+  end
   
   if Vagrant.has_plugin?("vagrant-cachier")
     config.cache.scope = :box
   end
 
-  #config.vm.provider "docker"
-  config.vm.provider "virtualbox" do |v|
-    config.vm.box = "centos/7"
+  config.vm.provider "docker" do |d, override|
+    d.image = "centos:7"
+  end
+  
+  config.vm.provider "virtualbox" do |v, override|
+    override.vm.box = "centos/7"
   end
   # Create a three node RS, all with the same configuration
   (1..3).each do |i|
@@ -17,19 +35,31 @@ Vagrant.configure("2") do |config|
       node.vm.hostname = "rs#{i}.mongodb.test"
       node.vm.synced_folder ".", "/vagrant", disabled: true
       node.vm.provision "hosts", :sync_hosts => true
-      node.vm.provision "file", source: "init-replicaset.js", destination: "init-replicaset.js"
-      node.vm.provision "file", source: "create-test-user.js", destination: "create-test-user.js"
-      node.vm.provision "file", source: "start-mongod-replset-node.sh", destination: "start-mongod-replset-node.sh"
+      node.vm.provision "file",  source: "mongod-ssh-rs.conf", destination: "mongod-ssh-rs.conf"
+      node.vm.provision "file",  source: "mongod-ssh-ssl.conf", destination: "mongod-ssh-ssl.conf"
+      node.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
+      node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
+      node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
+      node.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
+      node.vm.provision "file",  source: "create-test-user.js", destination: "create-test-user.js"
+      node.vm.provision "file",  source: "start-mongod-replset-node.sh", destination: "start-mongod-replset-node.sh"
+      node.vm.provision "shell", inline: 'chown vagrant:vagrant start-mongod-replset-node.sh ; chmod 700 start-mongod-replset-node.sh'
       node.vm.provision "shell", inline: "[ -d /home/vagrant/data ] || mkdir -p data", privileged: false
-      node.vm.provision "file", source: "test-keyfile", destination: "/home/vagrant/data/keyfile"
+      node.vm.provision "shell", inline: "[ -d /home/vagrant/data-ssl ] || mkdir -p data-ssl", privileged: false
+      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data/keyfile"
+      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-ssl/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
-      node.vm.provision "shell", path: "install-mongodb.sh"
-      node.vm.provision "shell", inline: "yum install -y vim"
-      node.vm.provision "shell", inline: <<-SHELL
+      node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data-ssl/keyfile ; chmod 600 /home/vagrant/data-ssl/keyfile"
+      node.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
+      node.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
+      node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
+      node.vm.provision "shell", inline: 'sudo yum install -y mongodb-org vim'
+      node.vm.provision "shell", inline: <<-SSHD_CONFIG
         sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
         systemctl restart sshd.service
-      SHELL
-      node.vm.provision "shell", inline: "[ -f /home/vagrant/.ssh/id_ecdsa ] || ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
+      SSHD_CONFIG
+      node.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh/ ] || mkdir /home/vagrant/.ssh", privileged: false
+      node.vm.provision "shell", inline: "echo #{insecure_ssh_pub_key} >> /home/vagrant/.ssh/authorized_keys", privileged: false
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
       end
@@ -40,20 +70,39 @@ Vagrant.configure("2") do |config|
   config.vm.define :testdriver do |tester|
     tester.vm.network :private_network, ip: "192.168.31.98"
     tester.vm.hostname = "testdriver.mongodb.test"
-    tester.vm.provision "file", source: "init-replicaset.js", destination: "init-replicaset.js"
-    tester.vm.provision "file", source: "setup-test-env.sh", destination: "setup-test-env.sh"
-    tester.vm.provision "shell", inline: "sudo yum install -y java-11-openjdk git emacs-nox wget epel-release"
-    tester.vm.provision "shell", inline: "sudo yum install -y python-pip python-devel"
+    tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
+    tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
+    tester.vm.provision "file",  source: "tls/CA/root.crt",    destination: "tls/root.crt"
+    tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
+    tester.vm.provision "file",  source: "config-timeouts.js", destination: "config-timeouts.js"
+    tester.vm.provision "file",  source: "setup-test-env.sh",  destination: "setup-test-env.sh"
+    tester.vm.provision "shell", inline: 'sudo yum install -y java-11-openjdk git emacs-nox wget epel-release'
+    tester.vm.provision 'shell', inline: 'sudo yum install -y python-pip python-devel'
     tester.vm.provision "shell", inline: "sudo pip install mtools==1.5.3 psutil pymongo"
-    tester.vm.provision "shell", path: "install-leiningen.sh"
-    tester.vm.provision "shell", path: "install-mongodb.sh"
+    tester.vm.provision 'shell', inline: <<-LEIN_INSTALL
+    if [ ! -d /home/vagrant/bin ]; then
+      mkdir -p /home/vagrant/bin
+    fi
+    if [ ! -f /home/vagrant/bin/lein ]; then
+      wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein -O /home/vagrant/bin/lein
+      chown vagrant:vagrant /home/vagrant/bin/lein
+      chmod a+x /home/vagrant/bin/lein
+    fi
+    LEIN_INSTALL
+    tester.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
+    tester.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
+    tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
+    tester.vm.provision "shell", inline: 'sudo yum install -y mongodb-org vim'
     tester.vm.provision "shell", inline: "mkdir -p git-repo/mdb-runtime-tester"
     tester.vm.provision "hosts", :sync_hosts => true
-    tester.vm.provision "shell", inline: "[ -f /home/vagrant/.ssh/id_ecdsa ] || ssh-keygen -t ecdsa -qf /home/vagrant/.ssh/id_ecdsa -P ''", privileged: false
+    tester.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh ] || mkdir /home/vagrant/.ssh", privileged: false
+    tester.vm.provision "file",  source: 'ssh/id_ed25519', destination: '.ssh/id_ed25519'
+    tester.vm.provision "file",  source: 'ssh/id_ed25519.pub', destination: '.ssh/id_ed25519.pub'
     tester.vm.synced_folder ".", "/vagrant", disabled: true
     tester.vm.synced_folder "../../mdb-runtime-tester/", "/home/vagrant/git-repo/mdb-runtime-tester"
     tester.vm.provider "virtualbox" do |vb|
       vb.customize ["modifyvm", :id, "--cpus", "2", "--memory", "3096"]
-    end    
+    end
+    tester.vm.provision 'shell', inline: '[ -d /home/vagrant/tmp/mdb-test ] || /home/vagrant/setup-test-env.sh', privileged: false
   end
 end
