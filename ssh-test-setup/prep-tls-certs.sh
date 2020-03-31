@@ -1,4 +1,4 @@
-# !/bin/sh
+# !/bin/bash
 #
 # Generates a set of TLS certificates for use with the test VMs.
 # Only needs to be run once before running vagrant up as the
@@ -16,7 +16,7 @@ openssl req -x509 -new -nodes -keyout tls/CA/root.key -sha256 -days 365 -out tls
 for i in 1 2 3
 do
     openssl req -new -nodes -keyout tls/rs$i/rs$i.key -out tls/rs$i/rs$i.csr -days 365 -subj "/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=rs$i.mongodb.test"
-    openssl x509 -req -days 365 -sha256 -in tls/rs$i/rs$i.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/rs$i/rs$i.crt
+    openssl x509 -req -days 365 -sha256 -in tls/rs$i/rs$i.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl.cnf -out tls/rs$i/rs$i.crt
     cat tls/rs$i/rs$i.crt tls/rs$i/rs$i.key > tls/rs$i/rs$i.pem
 done
 

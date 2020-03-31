@@ -2,7 +2,30 @@ require 'fileutils'
 
 Vagrant.configure("2") do |config|
   # Generate the TLS certs if they don't exist yet
-  if ((not File.file?("tls/rs1/rs1.pem")) || (not File.file?("tls/rs2/rs2.pem")) || (not File.file?("tls/rs3/rs3.pem")) || (not File.file?("tls/testdriver/testdriver.pem")) || (not File.file?("tls/CA/root.crt")))
+  if not File.directory?('tls')
+    Dir.mkdir 'tls'
+    Dir.mkdir 'tls/CA'
+    # Generate root certificate
+    system('openssl req -x509 -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/CA/root.key -sha256 -days 365 -out tls/CA/root.crt -subj "/C=US/ST=NY/L=NYC/O=TEST/CN=auth.mongodb.test"')
+    # Generate certificates for the replica set members
+    (1..3).each do |i|
+      Dir.mkdir "tls/rs#{i}"
+      tmp_cnf = "[SAN]\nsubjectAltName = @altNames\n[altNames]\nDNS.1 = localhost\nDNS.2 = rs#{i}.mongodb.test\n"
+      File.write("ext_openssl_rs#{i}.cnf", tmp_cnf)
+      system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/rs#{i}/rs#{i}.key -out tls/rs#{i}/rs#{i}.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=rs#{i}.mongodb.test\"")
+      system("openssl x509 -req -days 365 -sha256 -in tls/rs#{i}/rs#{i}.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_rs#{i}.cnf -out tls/rs#{i}/rs#{i}.crt")
+      system("cat tls/rs#{i}/rs#{i}.crt tls/rs#{i}/rs#{i}.key > tls/rs#{i}/rs#{i}.pem")
+    end
+    Dir.mkdir 'tls/testdriver'
+    tmp_cnf = "[SAN]\nsubjectAltName = @altNames\n[altNames]\nDNS.1 = localhost\nDNS.2 = testdriver.mongodb.test\n"
+    File.write('ext_openssl_td.cnf', tmp_cnf)
+    system('openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/testdriver/testdriver.key -out tls/testdriver/testdriver.csr -days 365 -subj "/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=testdriver.mongodb.test"')
+    system('openssl x509 -req -days 365 -sha256 -in tls/testdriver/testdriver.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/testdriver/testdriver.crt')
+    system('cat tls/testdriver/testdriver.crt tls/testdriver/testdriver.key > tls/testdriver/testdriver.pem')
+  end
+  exit
+  
+  if (not File.file?("tls/rs1/rs1.pem")) || (not File.file?("tls/rs2/rs2.pem")) || (not File.file?("tls/rs3/rs3.pem")) || (not File.file?("tls/testdriver/testdriver.pem")) || (not File.file?("tls/CA/root.crt"))
     system("prep-tls-cert.sh")
   end
   
@@ -41,6 +64,7 @@ Vagrant.configure("2") do |config|
       node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
       node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
       node.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
+      node.vm.provision "file",  source: "init-replicaset-ssl.js", destination: "init-replicaset-ssl.js"
       node.vm.provision "file",  source: "create-test-user.js", destination: "create-test-user.js"
       node.vm.provision "file",  source: "start-mongod-replset-node.sh", destination: "start-mongod-replset-node.sh"
       node.vm.provision "shell", inline: 'chown vagrant:vagrant start-mongod-replset-node.sh ; chmod 700 start-mongod-replset-node.sh'
@@ -73,7 +97,7 @@ Vagrant.configure("2") do |config|
     tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
     tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
     tester.vm.provision "file",  source: "tls/CA/root.crt",    destination: "tls/root.crt"
-    tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
+    #tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
     tester.vm.provision "file",  source: "config-timeouts.js", destination: "config-timeouts.js"
     tester.vm.provision "file",  source: "setup-test-env.sh",  destination: "setup-test-env.sh"
     tester.vm.provision "shell", inline: 'sudo yum install -y java-11-openjdk git emacs-nox wget epel-release'
