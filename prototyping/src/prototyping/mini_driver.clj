@@ -3,7 +3,8 @@
 (require          '[prototyping.conv-helpers :as pcv]
                   '[clojure.string           :as str])
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
-        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings])
+        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block]
+        [com.mongodb.connection SslSettings])
 
 (defn ^MongoClient mdb-connect-with-uri
   "Use a MongoDB URI to connect to a mongos/mongod/replica set/cluster"
@@ -13,15 +14,24 @@
 (defn ^MongoClient mdb-connect
   "Connect to a MongoDB database cluster using a URI and an optional
    authentication method"
-  [mongo-uri & { :keys [ user pwd auth-method ] :or { user nil pwd nil auth-method nil ssl false }}]
+  [mongo-uri & { :keys [ user pwd auth-method ssl ] :or { user nil pwd nil auth-method nil ssl false }}]
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
   (if (or (nil? auth-method) (str/starts-with? auth-method "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
     ;; encoded in the URI connection string
-    (cond (nil? user) (let [settings (ConnectionString. mongo-uri)]
-                        (MongoClients/create settings))
+    (cond (nil? user) (if ssl
+                        (MongoClients/create
+                         (-> (MongoClientSettings/builder)
+                             (.applyConnectionString (ConnectionString. mongo-uri))
+                             (.applyToSslSettings(reify
+                                                   com.mongodb.Block
+                                                   (apply [this s] (-> s
+                                                                       (.enabled ssl)
+                                                                       (.build)))))
+                             (.build)))
+                        (MongoClients/create (ConnectionString. mongo-uri)))
           (and (not (nil? user))
                (not (nil? pwd))) (let [settings (ConnectionString. mongo-uri)
                                        cred     (MongoCredential/createCredential user "admin" (char-array pwd))]
@@ -30,6 +40,11 @@
                                    (MongoClients/create
                                     (-> (MongoClientSettings/builder)
                                         (.applyConnectionString settings)
+                                        (.applyToSslSettings(reify
+                                                              com.mongodb.Block
+                                                              (apply [this s] (-> s
+                                                                                  (.enabled ssl)
+                                                                                  (.build)))))
                                         (.credential cred)
                                         (.build)))))
     (cond (and (= auth-method "MONGODB-X509")
