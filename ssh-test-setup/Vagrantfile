@@ -85,9 +85,9 @@ Vagrant.configure("2") do |config|
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
       end
+      node.vm.provision "shell", inline: '$HOME/start-mongod-replset-node.sh', privileged: false
     end
   end
-  
 
   config.vm.define :testdriver do |tester|
     tester.vm.network :private_network, ip: "192.168.31.98"
@@ -127,4 +127,12 @@ Vagrant.configure("2") do |config|
     end
     tester.vm.provision 'shell', inline: '[ -d /home/vagrant/tmp/mdb-test ] || /home/vagrant/setup-test-env.sh', privileged: false
   end
+
+  config.vm.define "rs-3" do |rs_node|
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:27017 init-replicaset.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:28017 --ssl --sslCAFile tls/root.crt init-replicaset-ssl.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:27017/admin?replicaSet=replTest create-test-user.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:28017/admin?replicaSet=replTestTLS --ssl --sslCAFile tls/root.crt create-test-user.js', privileged: false
+  end
+
 end
