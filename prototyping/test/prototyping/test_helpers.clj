@@ -3,6 +3,7 @@
             [prototyping.sys-helpers :refer :all])
   (:import  [com.mongodb ReadPreference]))
 
+
 (defn available-mongods
   "Try to create a list of available mongods on the current machine"
   []
@@ -51,8 +52,28 @@
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  [rs-uri num-nodes]
-  (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
+  ([rs-uri num-nodes]
+   (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
+  ([rs-uri num-nodes user pw]
+   (and (= (num-active-rs-members rs-uri user pw) num-nodes) (some? (get-rs-primary rs-uri user pw)))))
+
+(defn wait-test-rs-ready
+  "Waits until the replica set is ready for testing so we don't
+   have to play with timeouts all the time"
+  ([rs-uri num-mem max-retries]
+   (let [retries (atom 0)]
+     (while (and (not (replicaset-ready? rs-uri num-mem)) (< @retries max-retries))
+       (reset! retries (inc @retries))
+       (Thread/sleep 1100)
+       )
+     (< @retries max-retries)))
+  ([rs-uri num-mem user pw max-retries]
+   (let [retries (atom 0)]
+     (while (and (not (replicaset-ready? rs-uri num-mem user pw)) (< @retries max-retries))
+       (reset! retries (inc @retries))
+       (Thread/sleep 1100)
+       )
+     (< @retries max-retries))))
 
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"

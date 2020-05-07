@@ -8,7 +8,41 @@
 (ns prototyping.ssh-test-replicaset
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]))
+            [prototyping.test-helpers :refer :all]
+            [clj-ssh.ssh :as ssh :refer :all]))
+
+
+(defn- run-remote-ssh-command
+  "Execute a command described by cmdline on the remote server 'server'"
+  [server cmdline]
+  ;;(println "\nAttempting to run ssh command " cmdline "\n")
+  (let [agent   (ssh/ssh-agent {})
+        session (ssh/session agent server {:strict-host-key-checking :no})]
+    (ssh/with-connection session
+      (let [result (ssh/ssh session { :cmd cmdline })]
+        result))))
+
+(defn- start-remote-mongods
+  []
+  (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
+    (doall (map #(run-remote-ssh-command % "mongod -f mongod-ssh-rs.conf") servers))))
+
+(defn- stop-remote-mongods
+  []
+  (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
+    (doall (map #(run-remote-ssh-command % "pkill mongod") servers))))
+
+(defn- ssh-test-fixture
+  [f]
+  (start-remote-mongods)
+  (Thread/sleep 500)
+  (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 "admin" "pw99" 17)
+    (f)
+    (println "Test replica set not ready in time"))
+  (stop-remote-mongods)
+  (Thread/sleep 1000))
+
+(use-fixtures :each ssh-test-fixture)
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"

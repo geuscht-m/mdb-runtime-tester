@@ -11,21 +11,6 @@
   (let [homedir (System/getenv "HOME")]
     (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica"))))
 
-(defn- wait-test-rs-ready
-  "Waits until the replica set is ready for testing so we don't
-   have to play with timeouts all the time"
-  []
-  (let [rs-uri  "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000"
-        retries (atom 0)]
-    (while (and (not (replicaset-ready? rs-uri 5)) (< @retries 17))
-      (reset! retries (inc @retries))
-      (Thread/sleep 1100)
-      ;;(println "checking again")
-      )
-    ;;(println "Test RS ready\n")
-    ;;(println "Needed " @retries " retries")
-    (< @retries 17)))
-
 (defn- wait-mongod-shutdown
   "Wait until we have no further MongoDB processes running"
   []
@@ -37,14 +22,13 @@
   [f]
   (control-test-rs "start")
   (Thread/sleep 500)
-  (if (wait-test-rs-ready)
+  (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 17)
     (f)
     (println "Test replica set not ready in time"))
   (control-test-rs "stop")
   (wait-mongod-shutdown)) 
 
 (use-fixtures :each wrap-rs-tests)
-
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
@@ -60,8 +44,9 @@
 
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
-    (let [primary      (get (get-rs-primary "mongodb://localhost:27017") :name)
-          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://localhost:27017")))]
+    (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+          primary      (get (get-rs-primary rs-uri) :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries rs-uri)))]
       (println "Local primary is " primary)
       ;;(println "Local secondaries are " secondaries)
       (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
