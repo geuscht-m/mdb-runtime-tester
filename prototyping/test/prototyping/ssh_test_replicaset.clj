@@ -86,7 +86,7 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          restart-cmd (make-rs-degraded rs-uri :user user :pw pw) ]
+          restart-cmd (make-rs-degraded rs-uri :user user :password pw) ]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 30000)
       (is (replicaset-degraded? rs-uri user pw))

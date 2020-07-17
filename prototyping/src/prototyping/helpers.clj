@@ -259,14 +259,7 @@
      (kill-local-mongo-process-impl uri force user pw)
      (kill-remote-mongo-process-impl uri force user pw))))
 
-(defn send-mongo-rs-stepdown
-  "Sends stepdown to the mongod referenced by the URI
-   Note that the call requires a reconnect"
-  ([uri]
-   (run-replset-stepdown uri))
-  ([uri ^String user ^String pw]
-   (run-replset-stepdown uri :user user :password pw)))
-  
+
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
   [uri n & {:keys [^String user ^String pwd ssl] :or {user nil pwd nil ssl false}}]

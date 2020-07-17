@@ -26,7 +26,7 @@
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
   [uri & { :keys [force ^String user ^String pw ssl] :or { force false user nil pw nil ssl false } }]
   (println "Stopping process at " uri)
-  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :password pw :ssl ssl) :argv) })
+  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :username user :password pw :ssl ssl) :argv) })
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -42,20 +42,17 @@
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
-  [uri & wait-time]
-  ;;(println "Trying to stop mongo process on " uri)
-  (let [mongo-parameters (stop-mongo-process uri)]
+  [uri & { :keys [user password ssl] :or { user nil password nil ssl false}}]
+  (println "Restarting mongo process on " uri " with username " user " and password " password)
+  (let [mongo-parameters (stop-mongo-process uri :user user :pw password :ssl ssl)]
     ;;(println "Restarting mongo process at uri " uri " with parameters " mongo-parameters)
     (start-mongo-process (get mongo-parameters :uri) (get mongo-parameters :cmd-line))))
 
 (defn stepdown-primary
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
-  ([uri]
-   (let [primary (get (get-rs-primary uri) :name)]
-     (send-mongo-rs-stepdown (make-mongo-uri primary))))
-  ([uri ^String user ^String pw]
-   (let [primary (get (get-rs-primary uri :user user :pw pw) :name)]
-     (send-mongo-rs-stepdown (make-mongo-uri primary) user pw))))
+  [uri & { :keys [user password ssl] :or { user nil password nil ssl false}}]
+  (let [primary (get (get-rs-primary uri :user user :pw password :ssl ssl) :name)]
+    (run-replset-stepdown (make-mongo-uri primary) :user user :password password :ssl ssl )))
 
 (defn start-rs-nodes
   "Takes a list of URIs for mongod/mongos that need to be started"

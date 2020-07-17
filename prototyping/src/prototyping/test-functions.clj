@@ -16,9 +16,9 @@
   (let [primary     (get (get-rs-primary rs-uri :user user :pw pw :ssl ssl) :name)
         secondaries (doall (map #(get % :name) (get-rs-secondaries rs-uri :user user :pw pw :ssl ssl)))]
     (println "Primary is " primary ", secondaries are " secondaries)
-    (doall (map #(restart-mongo-process (make-mongo-uri %)) secondaries))
-    (stepdown-primary rs-uri)
-    (restart-mongo-process (make-mongo-uri primary))))
+    (doall (map #(restart-mongo-process (make-mongo-uri %) :user user :password pw) secondaries))
+    (stepdown-primary rs-uri :user user :password pw)
+    (restart-mongo-process (make-mongo-uri primary) :user user :password pw)))
 
 (defn restart-random-rs-member
   "Restart a random member of the replica set (secondary or primary)"
@@ -31,7 +31,7 @@
    Note - returns the 'undo' method needed to start the members again."
   [rs-uri member-num & { :keys [ user password ssl ] :or { user nil password nil ssl false } }]
   (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd password)))
-        restart-info (doall (map #(stop-mongo-process % user password) stop-members))]
+        restart-info (doall (map #(stop-mongo-process % :user user :pw password) stop-members))]
     ;;(println "\nRestart info" restart-info)
     (fn [] (if (seq? restart-info)
              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
@@ -40,6 +40,7 @@
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
   ([rs-uri & { :keys [ ^String user ^String password ssl ] :or { user nil password nil ssl false }}]
+   (println "make-rs-degraded called with URI " rs-uri " and user " user " and password " password)
    (let [num-members (get-num-rs-members rs-uri :user user :pwd password)
          stop-rs-num (quot num-members 2)]
      ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
