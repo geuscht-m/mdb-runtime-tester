@@ -24,14 +24,9 @@
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
-  ([uri]
-   { :uri uri :cmd-line (get (stop-mongo-process-impl uri) :argv) })
-  ([uri force]
-   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force) :argv) } )
-  ([uri ^String user ^String pw]
-   { :uri uri :cmd-line (get (stop-mongo-process-impl uri user pw) :argv) })
-  ([uri force ^String user ^String pw]
-   { :uri uri :cmd-line (get (stop-mongo-process-impl uri force user pw) :argv) } ))
+  [uri & { :keys [force ^String user ^String pw ssl] :or { force false user nil pw nil ssl false } }]
+  (println "Stopping process at " uri)
+  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :password pw :ssl ssl) :argv) })
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -59,7 +54,7 @@
    (let [primary (get (get-rs-primary uri) :name)]
      (send-mongo-rs-stepdown (make-mongo-uri primary))))
   ([uri ^String user ^String pw]
-   (let [primary (get (get-rs-primary uri user pw) :name)]
+   (let [primary (get (get-rs-primary uri :user user :pw pw) :name)]
      (send-mongo-rs-stepdown (make-mongo-uri primary) user pw))))
 
 (defn start-rs-nodes

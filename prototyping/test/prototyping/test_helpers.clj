@@ -1,6 +1,7 @@
 (ns prototyping.test-helpers
   (:require [prototyping.core :refer :all]
-            [prototyping.sys-helpers :refer :all])
+            [prototyping.sys-helpers :refer :all]
+            [clj-ssh.ssh :as ssh :refer :all])
   (:import  [com.mongodb ReadPreference]))
 
 
@@ -52,28 +53,37 @@
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  ([rs-uri num-nodes]
-   (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
-  ([rs-uri num-nodes user pw]
-   (and (= (num-active-rs-members rs-uri user pw) num-nodes) (some? (get-rs-primary rs-uri user pw)))))
+  ;; ([rs-uri num-nodes]
+  ;;  (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
+  ;; ([rs-uri num-nodes user pw]
+  ;;  (and (= (num-active-rs-members rs-uri user pw) num-nodes) (some? (get-rs-primary rs-uri user pw))))
+  [rs-uri num-nodes & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  (and (= (num-active-rs-members rs-uri :user user :pw pw :ssl ssl) num-nodes) (some? (get-rs-primary rs-uri :user user :pw pw :ssl ssl))))
 
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
-  ([rs-uri num-mem max-retries]
+  ;; ([rs-uri num-mem max-retries]
+  ;;  (let [retries (atom 0)]
+  ;;    (while (and (not (replicaset-ready? rs-uri num-mem)) (< @retries max-retries))
+  ;;      (reset! retries (inc @retries))
+  ;;      (Thread/sleep 1100)
+  ;;      )
+  ;;    (< @retries max-retries)))
+  ;; ([rs-uri num-mem user pw max-retries]
+  ;;  (let [retries (atom 0)]
+  ;;    (while (and (not (replicaset-ready? rs-uri num-mem user pw)) (< @retries max-retries))
+  ;;      (reset! retries (inc @retries))
+  ;;      (Thread/sleep 1100)
+  ;;      )
+  ;;    (< @retries max-retries)))
+  [rs-uri num-mem max-retries & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
    (let [retries (atom 0)]
-     (while (and (not (replicaset-ready? rs-uri num-mem)) (< @retries max-retries))
+     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pw pw :ssl ssl)) (< @retries max-retries))
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
        )
      (< @retries max-retries)))
-  ([rs-uri num-mem user pw max-retries]
-   (let [retries (atom 0)]
-     (while (and (not (replicaset-ready? rs-uri num-mem user pw)) (< @retries max-retries))
-       (reset! retries (inc @retries))
-       (Thread/sleep 1100)
-       )
-     (< @retries max-retries))))
 
 (defn replica-set-read-only?
   "Check if the replica set is read only (ie, has no primary)"
@@ -88,7 +98,7 @@
      (nil? primary)))
   ([rs-uri ^String user ^String pw]
    (let [mongo-uri   (make-mongo-uri rs-uri)
-         primary     (get-rs-primary mongo-uri user pw (ReadPreference/primaryPreferred))]
+         primary     (get-rs-primary mongo-uri :user user :pw pw)]
      ;;replset     (run-replset-get-status mongo-uri user pw)]
      ;;(println "\nget-rs-primary returned " primary "\n")
      ;;(println "\nget-replset-status returned " (get replset :members) "\n")
@@ -126,3 +136,20 @@
     (let [shards (get-shard-uris uri)]
       (println "\nShards: " shards "\n")
       (every? true? (doall (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards))))))
+
+;;
+;; SSH-based test helpers
+;;
+(defn- run-remote-ssh-command
+  "Execute a command described by cmdline on the remote server 'server'"
+  [server cmdline]
+  ;;(println "\nAttempting to run ssh command " cmdline "\n")
+  (let [agent   (ssh/ssh-agent {})
+        session (ssh/session agent server {:strict-host-key-checking :no})]
+    (ssh/with-connection session
+      (let [result (ssh/ssh session { :cmd cmdline })]
+        result))))
+
+(defn ssh-apply-command-to-rs-servers
+  [cmd servers]
+  (doall (map #(run-remote-ssh-command % cmd) servers)))

@@ -24,35 +24,25 @@
 ;; Local helper functions, not exposed to other namespaces
 
 (defn- run-serverstatus
-  ([uri]
-   ;;(println "Trying to run server status on " uri "\n")
-   (let [conn          (md/mdb-connect uri)
-         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-     (md/mdb-disconnect conn)
-     server-status))
-  ([uri ^String username ^String password]
-   (let [conn          (md/mdb-connect uri :user username :pwd password)
-         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-     (md/mdb-disconnect conn)
-     server-status)))
+  [uri & { :keys [ user password ssl ] :or { user nil password nil ssl false } } ]
+  (let [conn          (md/mdb-connect uri :user user :pwd password :ssl ssl)
+        server-status (md/mdb-admin-command conn { :serverStatus 1 })]
+    (md/mdb-disconnect conn)
+    server-status))
 
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
-  ([uri]
-   (let [conn       (md/mdb-connect uri)
-         shard-list (md/mdb-admin-command conn { :listShards 1 })]
+  [uri & { :keys [ username password ssl ] :or { username nil password nil ssl false } } ]
+  (let [conn       (md/mdb-connect uri :user username :pwd password :ssl ssl)
+        shard-list (md/mdb-admin-command conn { :listShards 1 })]
     (md/mdb-disconnect conn)
-   shard-list))
-  ([uri ^String username ^String password]
-   (let [conn       (md/mdb-connect uri :user username :pwd password)
-         shard-list (md/mdb-admin-command conn { :listShards 1 })]
-     (md/mdb-disconnect conn)
-     shard-list)))
+    shard-list))
 
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
-  [uri & { :keys [ read-preference user password ] :or { read-preference (ReadPreference/primaryPreferred) user nil password nil } } ]
-  (let [conn           (md/mdb-connect uri :user user :pwd password)
+  [uri & { :keys [ read-preference user password ssl ] :or { read-preference nil user nil password nil ssl false } } ]
+  (println "Trying to run replset-get-status on " uri " with user " user " and password " password)
+  (let [conn           (md/mdb-connect uri :user user :pwd password :ssl ssl)
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
     (md/mdb-disconnect conn)
     replset-status))
@@ -67,31 +57,24 @@
 
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
-  ([uri]
-   (let [conn (md/mdb-connect uri)]
+  [uri & { :keys [ user password ssl ] :or { user nil password nil ssl false } }]
+  (let [conn (md/mdb-connect uri :user user :pwd password :ssl ssl)]
     (try
       (md/mdb-admin-command conn { :replSetStepDown 120 })
       (catch com.mongodb.MongoSocketReadException e
         ;;(println "Caught expected exception " e)))))
         ;;(println "Connection closed")
         (md/mdb-disconnect conn)))))
-  ([uri ^String username ^String password]
-   (let [conn (md/mdb-connect uri :user username :pwd password)]
-     (try
-       (md/mdb-admin-command conn { :replSetStepDown 120 })
-       (catch com.mongodb.MongoSocketReadException e
-        ;;(println "Caught expected exception " e)))))
-        ;;(println "Connection closed")
-         (md/mdb-disconnect conn))))))
+   
 
 (defn- run-shutdown-command
   "Run the shutdown command on a remote or local mongod/s"
-  [conn-info & {:keys [force] :or {force false}}]
+  [conn-info & { :keys [ force-shutdown ] :or { force-shutdown false } } ]
   ;;(println "\n\nTrying to shut down mongod at " conn-info " with force setting " force)
   ;; NOTE: running shutdown will trigger an exception as the database
   ;;       connection will close. Catch and discard the exception here
   (try
-    (md/mdb-admin-command conn-info { :shutdown 1 :force force })
+    (md/mdb-admin-command conn-info { :shutdown 1 :force force-shutdown })
     (catch com.mongodb.MongoSocketReadException e
       (println "Exception caught as expected"))
     (catch java.lang.NullPointerException e
@@ -130,65 +113,33 @@
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
 (defn- get-rs-members-by-state
-  ([uri state]
-   (let [rs-state (run-replset-get-status uri)]
-     ;;(println rs-state "\n")
-     (filter #(= (get % :stateStr) state) (get rs-state :members))))
-  ([uri state ^ReadPreference rp]
-   (let [rs-state (run-replset-get-status uri rp)]
-     ;;(println rs-state "\n")
-     (filter #(= (get % :stateStr) state) (get rs-state :members))))
-  ([uri state ^String user ^String pw]
-   (let [rs-state (run-replset-get-status uri :user user :password pw)]
-     ;;(println rs-state "\n")
-     (filter #(= (get % :stateStr) state) (get rs-state :members))))
-  ([uri state ^String user ^String pw ^ReadPreference rp]
-   (let [rs-state (run-replset-get-status uri :user user :password pw :read-preference rp)]
-     ;;(println rs-state "\n")
-     (filter #(= (get % :stateStr) state) (get rs-state :members)))))
+  [uri state & { :keys [ user pw read-pref ssl ] :or { user nil pw nil read-pref nil ssl false } } ]
+  (let [rs-state (run-replset-get-status uri :user user :password pw :read-preference read-pref :ssl ssl)]
+    ;;(println rs-state "\n")
+    (filter #(= (get % :stateStr) state) (get rs-state :members))))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
-  ([uri]
-  ;;(println "\nTryin to get primary for replica set " uri "\n")
-   (first (get-rs-members-by-state uri "PRIMARY")))
-  ([uri ^ReadPreference rp]
-   (first (get-rs-members-by-state uri "PRIMARY" rp)))
-  ([uri ^String user ^String pw]
-   ;;(println "\nTryin to get primary for replica set " uri "\n")
-   (first (get-rs-members-by-state uri "PRIMARY" user pw)))
-  ([uri ^String user ^String pw ^ReadPreference rp]
-   (first (get-rs-members-by-state uri "PRIMARY" user pw rp))))
+  [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
+  (first (get-rs-members-by-state uri "PRIMARY" :user user :pw pw :read-pref read-pref :ssl ssl)))
 
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
-  ([uri]
-   (get-rs-members-by-state uri "SECONDARY"))
-  ([uri ^ReadPreference rp]
-   (get-rs-members-by-state uri "SECONDARY" rp))
-  ([uri ^String user ^String pw]
-   (get-rs-members-by-state uri "SECONDARY" user pw))
-  ([uri ^String user ^String pw ^ReadPreference rp]
-   (get-rs-members-by-state uri "SECONDARY" user pw rp)))
+  [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
+  (get-rs-members-by-state uri "SECONDARY" :user user :pw pw :read-pref read-pref :ssl ssl))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
-  ([uri]
-   (count (get (run-replset-get-status uri) :members)))
-  ([uri ^String username ^String password]
-   (count (get (run-replset-get-status uri :user username :password password) :members))))
+  ([uri & { :keys [ user pwd ssl ] :or { user nil pwd nil ssl false } }]
+   (count (get (run-replset-get-status uri :user user :password pwd :ssl ssl) :members))))
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
-  ([uri]
-   (let [members (get (run-replset-get-status uri) :members)
-         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
-     (count active-members)))
-  ([uri ^String user ^String pw]
-   (let [members (get (run-replset-get-status uri :user user :password pw) :members)
-         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
-     (count active-members))))
+  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  (let [members (get (run-replset-get-status uri :user user :password pw :ssl ssl :read-preference (ReadPreference/primaryPreferred)) :members)
+        active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
+    (count active-members)))
 
 (defn is-local-process?
   "Check if the mongo process referenced by the URI is local or not"
@@ -198,36 +149,29 @@
     (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
 
 (defn- get-process-type
-  ([uri]
-   (let [proc-type (get (run-serverstatus uri) :process)]
+  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  (let [proc-type (get (run-serverstatus uri :user user :password pw :ssl ssl) :process)]
      proc-type))
-  ([uri ^String user ^String pw]
-   (let [proc-type (get (run-serverstatus uri user pw) :process)]
-     proc-type)))
   
 (defn check-process-type
-  ([parameters]
-   (if (= (type parameters) String)
-     (get-process-type parameters)
-     (first parameters)))
-  ([parameters ^String user ^String pw]
-   (if (= (type parameters) String)
-     (get-process-type parameters user pw)
-     (first parameters))))
+  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  (if (= (type uri) String)
+    (get-process-type uri :user user :pw pw :ssl ssl)
+    (first uri)))
 
 (defn is-mongod-process?
   "Check if the process referenced by the startup is a mongod process"
   ([parameters]
    (= (check-process-type parameters) "mongod"))
   ([parameters ^String user ^String pw]
-   (= (check-process-type parameters user pw) "mongod")))
+   (= (check-process-type parameters :user user :pw pw) "mongod")))
 
 (defn is-mongos-process?
   "Check if the process referenced by the parameters seq is a mongos process"
   ([parameters]
    (= (check-process-type parameters) "mongos"))
   ([parameters ^String user ^String pw]
-   (= (check-process-type parameters user pw) "mongos")))
+   (= (check-process-type parameters :user user :pw pw) "mongos")))
 
 (defn start-local-mongo-process [uri process-settings]
   ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
@@ -254,28 +198,11 @@
   "Behind the scenes implementation of mongo process shutdown.
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
-  ([uri]
-   (let [conn (md/mdb-connect (make-mongo-uri uri))
+  ([uri & { :keys [force ^String username ^String password ssl] :or { force false username nil password nil ssl false } } ]
+   (println "Stopping mongo process at uri " uri " with username " username " and password " password)
+   (let [conn (md/mdb-connect uri :user username :pwd password :ssl ssl)
          cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn)
-     (md/mdb-disconnect conn)
-     cmdline))
-  ([uri force]
-   (let [conn (md/mdb-connect (make-mongo-uri uri))
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn force)
-     (md/mdb-disconnect conn)
-     cmdline))
-  ([uri ^String username ^String password]
-   (let [conn    (md/mdb-connect uri :user username :pwd password)
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn)
-     (md/mdb-disconnect conn)
-     cmdline))
-  ([uri force ^String username ^String password]
-   (let [conn (md/mdb-connect uri :user username :pwd password)
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn force)
+     (run-shutdown-command conn :force-shutdown force)
      (md/mdb-disconnect conn)
      cmdline)))
 
@@ -338,20 +265,16 @@
   ([uri]
    (run-replset-stepdown uri))
   ([uri ^String user ^String pw]
-   (run-replset-stepdown uri user pw)))
+   (run-replset-stepdown uri :user user :password pw)))
   
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
-  ([uri n]
+  [uri n & {:keys [^String user ^String pwd ssl] :or {user nil pwd nil ssl false}}]
   ;;(println "\nGetting random members for replset " uri "\n")
-  (let [rs-members (get (run-replset-get-status uri) :members)]
+  (let [rs-members (get (run-replset-get-status uri :user user :password pwd :ssl ssl) :members)]
     ;;(println "\nWorking on member list " rs-members "\n")
     (take n (shuffle rs-members))))
-  ([uri n ^String username ^String password]
-   ;;(println "\nGetting random members for replset " uri "\n")
-   (let [rs-members (get (run-replset-get-status uri :user username :password password) :members)]
-     ;;(println "\nWorking on member list " rs-members "\n")
-     (take n (shuffle rs-members)))))
+
 
 (defn get-random-shards
   "Returns a list of n random shards from the sharded cluster referenced by the uri"

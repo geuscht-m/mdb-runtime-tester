@@ -12,12 +12,13 @@
 
 (defn simulate-maintenance
   "Simulate maintenance/rolling mongod bounce on a replica set. Fails if the RS URI doesn't point to a valid RS"
-  [rs-uri]
-  (let [primary     (get (get-rs-primary rs-uri) :name)
-        secondaries (doall (map #(get % :name) (get-rs-secondaries rs-uri)))]
-    (doall (map #(restart-mongo-process %) secondaries))
+  [rs-uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  (let [primary     (get (get-rs-primary rs-uri :user user :pw pw :ssl ssl) :name)
+        secondaries (doall (map #(get % :name) (get-rs-secondaries rs-uri :user user :pw pw :ssl ssl)))]
+    (println "Primary is " primary ", secondaries are " secondaries)
+    (doall (map #(restart-mongo-process (make-mongo-uri %)) secondaries))
     (stepdown-primary rs-uri)
-    (restart-mongo-process primary)))
+    (restart-mongo-process (make-mongo-uri primary))))
 
 (defn restart-random-rs-member
   "Restart a random member of the replica set (secondary or primary)"
@@ -28,45 +29,28 @@
 (defn- partial-stop-rs
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
-  ([rs-uri member-num]
-   ;;(println "Stopping " member-num " members of replica set " rs-uri)
-   (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num)))
-         restart-info (doall (map stop-mongo-process stop-members))]
-     ;;(println "\nRestart info" restart-info)
-     (fn [] (if (seq? restart-info)
-              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
-              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
-  ([rs-uri member-num ^String user ^String password]
-   (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num user password)))
-         restart-info (doall (map #(stop-mongo-process % user password) stop-members))]
-     ;;(println "\nRestart info" restart-info)
-     (fn [] (if (seq? restart-info)
-              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
-              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line)))))))
+  [rs-uri member-num & { :keys [ user password ssl ] :or { user nil password nil ssl false } }]
+  (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd password)))
+        restart-info (doall (map #(stop-mongo-process % user password) stop-members))]
+    ;;(println "\nRestart info" restart-info)
+    (fn [] (if (seq? restart-info)
+             (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
+             (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
-  ([rs-uri]
-   (let [num-members (get-num-rs-members rs-uri)
+  ([rs-uri & { :keys [ ^String user ^String password ssl ] :or { user nil password nil ssl false }}]
+   (let [num-members (get-num-rs-members rs-uri :user user :pwd password)
          stop-rs-num (quot num-members 2)]
      ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
      ;;(println "\nStopping RS members from uri " rs-uri "\n")
-     (partial-stop-rs rs-uri stop-rs-num)))
-  ([rs-uri ^String user ^String password]
-   (let [num-members (get-num-rs-members rs-uri user password)
-         stop-rs-num (quot num-members 2)]
-     ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
-     ;;(println "\nStopping RS members from uri " rs-uri "\n")
-     (partial-stop-rs rs-uri stop-rs-num user password))))
+     (partial-stop-rs rs-uri stop-rs-num :user user :password password))))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
-  ([rs-uri]
+  ([rs-uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
    ;;(println "\nMaking replica set read only " rs-uri "\n")
-   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri) 2) 1)))
-  ([rs-uri ^String user ^String pw]
-   ;;(println "\nMaking replica set read only " rs-uri "\n")
-   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri user pw) 2) 1) user pw)))
+   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pw :ssl ssl) 2) 1) :user user :password pw :ssl ssl)))
 
 (defn make-shard-degraded
   "Simulate a single degraded shard on a sharded cluster"

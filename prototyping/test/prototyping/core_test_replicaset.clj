@@ -127,7 +127,8 @@
 
 (deftest test-simulate-maintenance
   (testing "Test that the simulate-maintenance function correct does a rolling restart"
-    (let [num-mongods (num-active-rs-members "mongodb://localhost:27017")]
-      (simulate-maintenance "mongodb://localhost:27017")
+    (let [rs-uri "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+          num-mongods (num-active-rs-members rs-uri)]
+      (simulate-maintenance rs-uri)
       (Thread/sleep 15000)
-      (is (= (num-active-rs-members "mongodb://localhost:27017") num-mongods)))))
+      (is (= (num-active-rs-members rs-uri) num-mongods)))))

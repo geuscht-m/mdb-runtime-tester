@@ -8,39 +8,26 @@
 (ns prototyping.ssh-test-replicaset
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]
-            [clj-ssh.ssh :as ssh :refer :all]))
-
-
-(defn- run-remote-ssh-command
-  "Execute a command described by cmdline on the remote server 'server'"
-  [server cmdline]
-  ;;(println "\nAttempting to run ssh command " cmdline "\n")
-  (let [agent   (ssh/ssh-agent {})
-        session (ssh/session agent server {:strict-host-key-checking :no})]
-    (ssh/with-connection session
-      (let [result (ssh/ssh session { :cmd cmdline })]
-        result))))
+            [prototyping.test-helpers :refer :all]))
 
 (defn- start-remote-mongods
-  []
-  (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
-    (doall (map #(run-remote-ssh-command % "mongod -f mongod-ssh-rs.conf") servers))))
+  [servers]
+  (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-rs.conf" servers))
 
 (defn- stop-remote-mongods
-  []
-  (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
-    (doall (map #(run-remote-ssh-command % "pkill mongod") servers))))
+  [servers]
+  (ssh-apply-command-to-rs-servers "pkill mongod" servers))
 
 (defn- ssh-test-fixture
   [f]
-  (start-remote-mongods)
-  (Thread/sleep 500)
-  (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 "admin" "pw99" 17)
-    (f)
-    (println "Test replica set not ready in time"))
-  (stop-remote-mongods)
-  (Thread/sleep 1000))
+  (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
+    (start-remote-mongods servers)
+    (Thread/sleep 500)
+    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pw "pw99")
+      (f)
+      (println "Test replica set not ready in time"))
+    (stop-remote-mongods servers)
+    (Thread/sleep 1000)))
 
 (use-fixtures :each ssh-test-fixture)
 
@@ -60,8 +47,8 @@
 
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
-    (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" "admin" "pw99") :name)
-          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" "admin" "pw99")))]
+    (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99") :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99")))]
       (println "Remote primary is " primary)
       (println "Remote secondaries are " secondaries)
       (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
@@ -88,10 +75,10 @@
   (testing "Check that stepping down the primary on an RS works"
     (let [user             "admin"
           pw               "pw99"
-          original-primary (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name)]
+          original-primary (get (get-rs-primary "mongodb://rs1.mongodb.test" :user user :pw pw) :name)]
       (trigger-election "mongodb://rs1.mongodb.test" user pw)
       (Thread/sleep 11000)
-      (is (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" user pw) :name) original-primary))))))
+      (is (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" :user user :pw pw) :name) original-primary))))))
 
 
 (deftest test-remote-degrade-rs
@@ -99,7 +86,7 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          restart-cmd (make-rs-degraded rs-uri user pw) ]
+          restart-cmd (make-rs-degraded rs-uri :user user :pw pw) ]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 30000)
       (is (replicaset-degraded? rs-uri user pw))
@@ -114,13 +101,23 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          restart-cmd (make-rs-read-only rs-uri user pw)]
+          restart-cmd (make-rs-read-only rs-uri :user user :pw pw)]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 20000)
-      (is (= (num-active-rs-members rs-uri user pw) 1))
+      (is (= (num-active-rs-members rs-uri :user user :pw pw) 1))
       (is (replica-set-read-only? rs-uri user pw))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
-      (is (= (num-active-rs-members rs-uri user pw) 3))
+      (is (= (num-active-rs-members rs-uri :user user :pw pw) 3))
       )))
+
+(deftest test-remote-simulate-maintenance
+  (testing "Test that the simulate-maintenance function correct does a rolling restart and works with authentication"
+    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
+          user   "admin"
+          pw     "pw99"
+          num-mongods (num-active-rs-members rs-uri :user user :pw pw)]
+      (simulate-maintenance rs-uri :user user :pw pw)
+      (Thread/sleep 15000)
+      (is (= (num-active-rs-members rs-uri :user user :pw pw) num-mongods)))))

@@ -18,10 +18,11 @@
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
+  ;;(println "Attempting to connect to " mongo-uri)
   (if (or (nil? auth-method) (str/starts-with? auth-method "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
     ;; encoded in the URI connection string
-    (cond (nil? user) (if ssl
+    (cond (nil? user) (if (true? ssl)
                         (MongoClients/create
                          (-> (MongoClientSettings/builder)
                              (.applyConnectionString (ConnectionString. mongo-uri))
