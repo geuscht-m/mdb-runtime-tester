@@ -73,12 +73,13 @@
 
 (deftest test-remote-stepdown
   (testing "Check that stepping down the primary on an RS works"
-    (let [user             "admin"
+    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
+          user             "admin"
           pw               "pw99"
-          original-primary (get (get-rs-primary "mongodb://rs1.mongodb.test" :user user :pw pw) :name)]
-      (trigger-election "mongodb://rs1.mongodb.test" user pw)
+          original-primary (get (get-rs-primary rs-uri :user user :pw pw) :name)]
+      (trigger-election rs-uri :user user :pwd pw)
       (Thread/sleep 11000)
-      (is (not (= (get (get-rs-primary "mongodb://rs1.mongodb.test" :user user :pw pw) :name) original-primary))))))
+      (is (not (= (get (get-rs-primary rs-uri :user user :pw pw) :name) original-primary))))))
 
 
 (deftest test-remote-degrade-rs

@@ -24,9 +24,9 @@
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
-  [uri & { :keys [force ^String user ^String pw ssl] :or { force false user nil pw nil ssl false } }]
-  (println "Stopping process at " uri)
-  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :username user :password pw :ssl ssl) :argv) })
+  [uri & { :keys [force ^String user ^String pwd ssl] :or { force false user nil pwd nil ssl false } }]
+  ;;(println "Stopping process at " uri " with user " user " and password " pwd)
+  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :username user :password pwd :ssl ssl) :argv) })
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -43,8 +43,8 @@
 (defn restart-mongo-process
   "Stops and starts a mongo process"
   [uri & { :keys [user password ssl] :or { user nil password nil ssl false}}]
-  (println "Restarting mongo process on " uri " with username " user " and password " password)
-  (let [mongo-parameters (stop-mongo-process uri :user user :pw password :ssl ssl)]
+  ;;(println "Restarting mongo process on " uri " with username " user " and password " password)
+  (let [mongo-parameters (stop-mongo-process uri :user user :pwd password :ssl ssl)]
     ;;(println "Restarting mongo process at uri " uri " with parameters " mongo-parameters)
     (start-mongo-process (get mongo-parameters :uri) (get mongo-parameters :cmd-line))))
 

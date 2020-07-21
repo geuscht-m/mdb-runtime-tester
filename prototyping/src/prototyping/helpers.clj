@@ -41,7 +41,7 @@
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
   [uri & { :keys [ read-preference user password ssl ] :or { read-preference nil user nil password nil ssl false } } ]
-  (println "Trying to run replset-get-status on " uri " with user " user " and password " password)
+  ;;(println "Trying to run replset-get-status on " uri " with user " user " and password " password)
   (let [conn           (md/mdb-connect uri :user user :pwd password :ssl ssl)
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
     (md/mdb-disconnect conn)
@@ -121,6 +121,7 @@
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
+  (println "Getting primary for rs " uri " with user " user " and password " pw)
   (first (get-rs-members-by-state uri "PRIMARY" :user user :pw pw :read-pref read-pref :ssl ssl)))
 
 
@@ -199,7 +200,7 @@
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
   ([uri & { :keys [force ^String username ^String password ssl] :or { force false username nil password nil ssl false } } ]
-   (println "Stopping mongo process at uri " uri " with username " username " and password " password)
+   ;;(println "Stopping mongo process at uri " uri " with username " username " and password " password)
    (let [conn (md/mdb-connect uri :user username :pwd password :ssl ssl)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn :force-shutdown force)
