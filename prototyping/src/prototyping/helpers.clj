@@ -121,7 +121,7 @@
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
-  (println "Getting primary for rs " uri " with user " user " and password " pw)
+  ;;(println "Getting primary for rs " uri " with user " user " and password " pw)
   (first (get-rs-members-by-state uri "PRIMARY" :user user :pw pw :read-pref read-pref :ssl ssl)))
 
 
@@ -137,8 +137,8 @@
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
-  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
-  (let [members (get (run-replset-get-status uri :user user :password pw :ssl ssl :read-preference (ReadPreference/primaryPreferred)) :members)
+  [uri & { :keys [ user pwd ssl ] :or { user nil pwd nil ssl false } }]
+  (let [members (get (run-replset-get-status uri :user user :password pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred)) :members)
         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
     (count active-members)))
 
@@ -207,60 +207,20 @@
      (md/mdb-disconnect conn)
      cmdline)))
 
-(defn- kill-local-mongo-process-impl
-  "Kill the mongodb process via OS signal. There are two options:
-     - force = false/nil - use SIGTERM for orderly shutdown
-     - force = true      - use SIGKILL to simulate crash"
-  ([uri force]
-   (let [conn          (md/mdb-connect uri)
-         cmd-line      (run-server-get-cmd-line-opts conn)
-         server-status (run-server-status conn)
-         pid           (get server-status :pid)]
-     (md/mdb-disconnect conn)
-     (os/kill-local-process pid force)
-     cmd-line)))
-
-(defn- kill-remote-mongo-process-impl
-  "Kills a remote mongo process via OS signal. Similar functionality
-   to the function above, but executed on a remote machine and thus
-   using the 'kill' command rather than talking to the C library
-   directly"
-  ([uri force]
-   (let [conn          (md/mdb-connect uri)
-         cmd-line      (run-server-get-cmd-line-opts conn)
-         server-status (run-server-status conn)
-         pid           (get server-status :pid)]
-     (md/mdb-disconnect conn)
-     (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
-     cmd-line))
-  ([uri force ^String user ^String pw]
-   (let [conn          (md/mdb-connect uri :user user :pwd pw)
-         cmd-line      (run-server-get-cmd-line-opts conn)
-         server-status (run-server-status conn)
-         pid           (get server-status :pid)]
-     (md/mdb-disconnect conn)
-     (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid)))
-     cmd-line)))
-
 (defn kill-mongo-process-impl
-  ([uri]
-   (if (is-local-process? uri)
-     (kill-local-mongo-process-impl uri false)
-     (kill-remote-mongo-process-impl uri false)))
-  ([uri force]
-   (if (is-local-process? uri)
-     (kill-local-mongo-process-impl uri force)
-     (kill-remote-mongo-process-impl uri force)))
-  ([uri ^String user ^String pw]
-   (if (is-local-process? uri)
-     (kill-local-mongo-process-impl uri false user pw)
-     (kill-remote-mongo-process-impl uri false user pw)))
-  ([uri force ^String user ^String pw]
-   (if (is-local-process? uri)
-     (kill-local-mongo-process-impl uri force user pw)
-     (kill-remote-mongo-process-impl uri force user pw))))
-
-
+  "Implementation of kill-mongo-process that distinguishes between a local and remote process, and
+   calls the appropriate function to stop the mongo process."
+  [uri & { :keys [force user pwd ssl root-ca] :or { force false user nil pwd nil ssl false root-ca nil }}]
+  (let [conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+        cmd-line      (run-server-get-cmd-line-opts conn)
+        server-status (run-server-status conn)
+        pid           (get server-status :pid)]
+     (md/mdb-disconnect conn)     
+     (if (is-local-process? uri)
+       (os/kill-local-process pid force)
+       (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid))))
+     cmd-line))
+    
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
   [uri n & {:keys [^String user ^String pwd ssl] :or {user nil pwd nil ssl false}}]

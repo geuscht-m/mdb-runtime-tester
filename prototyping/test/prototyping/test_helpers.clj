@@ -53,12 +53,8 @@
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  ;; ([rs-uri num-nodes]
-  ;;  (and (= (num-active-rs-members rs-uri) num-nodes) (some? (get-rs-primary rs-uri))))
-  ;; ([rs-uri num-nodes user pw]
-  ;;  (and (= (num-active-rs-members rs-uri user pw) num-nodes) (some? (get-rs-primary rs-uri user pw))))
   [rs-uri num-nodes & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
-  (and (= (num-active-rs-members rs-uri :user user :pw pw :ssl ssl) num-nodes) (some? (get-rs-primary rs-uri :user user :pw pw :ssl ssl))))
+  (and (= (num-active-rs-members rs-uri :user user :pwd pw :ssl ssl) num-nodes) (some? (get-rs-primary rs-uri :user user :pw pw :ssl ssl))))
 
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't

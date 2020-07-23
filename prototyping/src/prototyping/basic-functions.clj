@@ -31,14 +31,10 @@
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
    SIGTERM or SIGKILL to shut down the process rather than sending the process a shutdown command"
-  ([uri]
-   { :uri uri :cmd-line (get (kill-mongo-process-impl uri) :argv) })
-  ([uri force]
-   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force) :argv) } )
-  ([uri ^String user ^String pw]
-   { :uri uri :cmd-line (get (kill-mongo-process-impl uri user pw) :argv) })
-  ([uri force ^String user ^String pw]
-   { :uri uri :cmd-line (get (kill-mongo-process-impl uri force user pw) :argv) } ))
+  [uri & { :keys [ force user pwd ssl root-ca ] :or { force false user nil pwd nil ssl false root-ca nil } }]
+  (let [result (kill-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca)]
+    ;;(println "kill-mongo-process-impl returned " result)
+    { :uri uri :cmd-line (get result :argv) }))
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"

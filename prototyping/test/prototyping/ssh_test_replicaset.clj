@@ -49,27 +49,11 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99")))]
-      (println "Remote primary is " primary)
-      (println "Remote secondaries are " secondaries)
+      ;;(println "Remote primary is " primary)
+      ;;(println "Remote secondaries are " secondaries)
       (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
       (is (not (some #{primary} secondaries)))
       (is (= (count secondaries) 2)))))
-
-(deftest test-remote-rs-kill-single
-  (testing "Make sure we can shut down and restart a random remote replica set member"
-    (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
-          user   "admin"
-          pw     "pw99"
-          ;;restart-cmd (make-rs-degraded rs-uri) ]
-          restart-info (kill-mongo-process "mongodb://rs2.mongodb.test" user pw)]
-      (is (not (nil? restart-info)))
-      (println "Restart info is " restart-info)
-      (Thread/sleep 30000)
-      (is (replicaset-degraded? rs-uri user pw))
-      (Thread/sleep 1000)
-      (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))
-      (Thread/sleep 5000)
-      (is (not (replicaset-degraded? rs-uri user pw))))))
 
 (deftest test-remote-stepdown
   (testing "Check that stepping down the primary on an RS works"
@@ -105,12 +89,43 @@
           restart-cmd (make-rs-read-only rs-uri :user user :pw pw)]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 20000)
-      (is (= (num-active-rs-members rs-uri :user user :pw pw) 1))
+      (is (= (num-active-rs-members rs-uri :user user :pwd pw) 1))
       (is (replica-set-read-only? rs-uri user pw))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
-      (is (= (num-active-rs-members rs-uri :user user :pw pw) 3))
+      (is (= (num-active-rs-members rs-uri :user user :pwd pw) 3))
+      )))
+
+(deftest test-kill-mongo-process
+  (testing "Check that we can shut down a remote mongo process using a signal instead of the
+            mongo command"
+    (let [rs-uri  "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
+          uri     "mongodb://rs1.mongodb.test:27017"
+          user    "admin"
+          pwd     "pw99"
+          cmdline (kill-mongo-process uri :user user :pwd pwd)]
+      (is (not (nil? cmdline)))
+      (Thread/sleep 12000)
+      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 2))
+      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+      (Thread/sleep 7000)
+      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 3))
+      )))
+
+(deftest test-crash-mongo-process
+  (testing "Check that we can successfully 'crash' (kill -9) a mongod and restart it"
+    (let [rs-uri  "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
+          uri     "mongodb://rs3.mongodb.test"
+          user    "admin"
+          pwd     "pw99"
+          cmdline (kill-mongo-process uri :force true :user user :pwd pwd)]
+      (is (not (nil? cmdline)))
+      (Thread/sleep 15000)
+      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 2))
+      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+      (Thread/sleep 5000)
+      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 3))
       )))
 
 (deftest test-remote-simulate-maintenance
@@ -118,7 +133,7 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          num-mongods (num-active-rs-members rs-uri :user user :pw pw)]
+          num-mongods (num-active-rs-members rs-uri :user user :pwd pw)]
       (simulate-maintenance rs-uri :user user :pw pw)
       (Thread/sleep 15000)
-      (is (= (num-active-rs-members rs-uri :user user :pw pw) num-mongods)))))
+      (is (= (num-active-rs-members rs-uri :user user :pwd pw) num-mongods)))))

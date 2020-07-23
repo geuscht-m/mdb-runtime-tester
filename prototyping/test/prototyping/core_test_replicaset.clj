@@ -47,7 +47,7 @@
     (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
           primary      (get (get-rs-primary rs-uri) :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries rs-uri)))]
-      (println "Local primary is " primary)
+      ;;(println "Local primary is " primary)
       ;;(println "Local secondaries are " secondaries)
       (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
       (is (not (some #{primary} secondaries)))
@@ -116,7 +116,7 @@
 
 (deftest test-crash-mongo-process
   (testing "Check that we can successfully 'crash' (kill -9) a mongod and restart it"
-    (let [cmdline (kill-mongo-process "mongodb://localhost:27017" true)]
+    (let [cmdline (kill-mongo-process "mongodb://localhost:27017" :force true)]
       (is (not (nil? cmdline)))
       (Thread/sleep 15000)
       (is (= (num-active-rs-members "mongodb://localhost:27018") 4))
