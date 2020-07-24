@@ -11,6 +11,7 @@ This vagrant configuration expects the following Vagrant plugins, otherwise it w
 - vagrant-disksize
 - vagrant-hosts
 - vagrant-vbguest
+- vagrant-reload
 
 The vagrant-cachier plugin is not required, but recommended.
 
