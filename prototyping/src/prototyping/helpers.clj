@@ -24,15 +24,15 @@
 ;; Local helper functions, not exposed to other namespaces
 
 (defn- run-serverstatus
-  [uri & { :keys [ user password ssl ] :or { user nil password nil ssl false } } ]
-  (let [conn          (md/mdb-connect uri :user user :pwd password :ssl ssl)
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} } ]
+  (let [conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
     (md/mdb-disconnect conn)
     server-status))
 
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
-  [uri & { :keys [ username password ssl ] :or { username nil password nil ssl false } } ]
+  [uri & { :keys [ username password ssl root-ca ] :or { username nil password nil ssl false root-ca nil} } ]
   (let [conn       (md/mdb-connect uri :user username :pwd password :ssl ssl)
         shard-list (md/mdb-admin-command conn { :listShards 1 })]
     (md/mdb-disconnect conn)
@@ -40,9 +40,10 @@
 
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
-  [uri & { :keys [ read-preference user password ssl ] :or { read-preference nil user nil password nil ssl false } } ]
-  ;;(println "Trying to run replset-get-status on " uri " with user " user " and password " password)
-  (let [conn           (md/mdb-connect uri :user user :pwd password :ssl ssl)
+  [uri & { :keys [ read-preference user pwd ssl root-ca ] :or { read-preference nil user nil pwd nil ssl false root-ca nil} } ]
+  ;;(println "Trying to run replset-get-status on " uri " with user " user " and password " pwd)
+  (let [ssl-enabled    (or ssl (.contains uri "ssl=true"))
+        conn           (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
     (md/mdb-disconnect conn)
     replset-status))
@@ -57,8 +58,9 @@
 
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
-  [uri & { :keys [ user password ssl ] :or { user nil password nil ssl false } }]
-  (let [conn (md/mdb-connect uri :user user :pwd password :ssl ssl)]
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
+  (println "Attempting to step down primary at " uri " with user " user " and root-ca " root-ca)
+  (let [conn (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca)]
     (try
       (md/mdb-admin-command conn { :replSetStepDown 120 })
       (catch com.mongodb.MongoSocketReadException e
@@ -97,7 +99,7 @@
         session (ssh/session agent server {:strict-host-key-checking :no})]
     (ssh/with-connection session
       (let [result (ssh/ssh session { :cmd (build-cmd-line-string cmdline) })]
-        result))))
+        (get result :exit)))))
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
@@ -113,32 +115,33 @@
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
 (defn- get-rs-members-by-state
-  [uri state & { :keys [ user pw read-pref ssl ] :or { user nil pw nil read-pref nil ssl false } } ]
-  (let [rs-state (run-replset-get-status uri :user user :password pw :read-preference read-pref :ssl ssl)]
+  [uri state & { :keys [ user pwd read-pref ssl root-ca ] :or { user nil pwd nil read-pref nil ssl false root-ca nil} } ]
+  (let [rs-state (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca)]
     ;;(println rs-state "\n")
     (filter #(= (get % :stateStr) state) (get rs-state :members))))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
-  ;;(println "Getting primary for rs " uri " with user " user " and password " pw)
-  (first (get-rs-members-by-state uri "PRIMARY" :user user :pw pw :read-pref read-pref :ssl ssl)))
-
+  [uri & { :keys [ read-pref user pwd ssl root-ca] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil}}]
+  (println "Getting primary for rs " uri " with user " user ", root-ca " root-ca " and password " pwd)
+  (first (get-rs-members-by-state uri "PRIMARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca)))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri & { :keys [ read-pref user pw ssl ] :or { read-pref (ReadPreference/primaryPreferred) user nil pw nil ssl false }}]
-  (get-rs-members-by-state uri "SECONDARY" :user user :pw pw :read-pref read-pref :ssl ssl))
+  [uri & { :keys [ read-pref user pwd ssl root-ca ] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil}}]
+  (println "Getting secondary for rs " uri ", user " user ", root-ca " root-ca)
+  (get-rs-members-by-state uri "SECONDARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
-  ([uri & { :keys [ user pwd ssl ] :or { user nil pwd nil ssl false } }]
-   (count (get (run-replset-get-status uri :user user :password pwd :ssl ssl) :members))))
+  ([uri & { :keys [ user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil } }]
+   (count (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :members))))
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
-  [uri & { :keys [ user pwd ssl ] :or { user nil pwd nil ssl false } }]
-  (let [members (get (run-replset-get-status uri :user user :password pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred)) :members)
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  (let [ssl-enabled (or ssl (.contains uri "ssl=true"))
+        members     (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl-enabled :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) :members)
         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
     (count active-members)))
 
@@ -149,30 +152,25 @@
         hostname   (os/get-hostname)]
     (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
 
-(defn- get-process-type
-  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
-  (let [proc-type (get (run-serverstatus uri :user user :password pw :ssl ssl) :process)]
-     proc-type))
-  
 (defn check-process-type
-  [uri & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  "Retrieve the process type from serverstatus"
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
+  ;;(println "Trying to get process type for uri " uri " with user " user " and root-ca " root-ca)
   (if (= (type uri) String)
-    (get-process-type uri :user user :pw pw :ssl ssl)
-    (first uri)))
+      (let [ssl-enabled (or ssl (.contains uri "ssl=true"))]
+      ;;(get-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+        (get (run-serverstatus uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca) :process))
+      (first uri)))
 
 (defn is-mongod-process?
   "Check if the process referenced by the startup is a mongod process"
-  ([parameters]
-   (= (check-process-type parameters) "mongod"))
-  ([parameters ^String user ^String pw]
-   (= (check-process-type parameters :user user :pw pw) "mongod")))
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca) "mongod"))
 
 (defn is-mongos-process?
   "Check if the process referenced by the parameters seq is a mongos process"
-  ([parameters]
-   (= (check-process-type parameters) "mongos"))
-  ([parameters ^String user ^String pw]
-   (= (check-process-type parameters :user user :pw pw) "mongos")))
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca) "mongos"))
 
 (defn start-local-mongo-process [uri process-settings]
   ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
@@ -199,9 +197,10 @@
   "Behind the scenes implementation of mongo process shutdown.
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
-  ([uri & { :keys [force ^String username ^String password ssl] :or { force false username nil password nil ssl false } } ]
-   ;;(println "Stopping mongo process at uri " uri " with username " username " and password " password)
-   (let [conn (md/mdb-connect uri :user username :pwd password :ssl ssl)
+  ([uri & { :keys [force ^String user ^String pwd ssl root-ca] :or { force false user nil pwd nil ssl false root-ca nil} } ]
+   ;;(println "Stopping mongo process at uri " uri " with username " user " and password " pwd)
+   (let [ssl-enabled (or ssl (.contains uri "ssl=true"))
+         conn (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)
          cmdline (run-server-get-cmd-line-opts conn)]
      (run-shutdown-command conn :force-shutdown force)
      (md/mdb-disconnect conn)
@@ -223,9 +222,9 @@
     
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
-  [uri n & {:keys [^String user ^String pwd ssl] :or {user nil pwd nil ssl false}}]
+  [uri n & {:keys [^String user ^String pwd ssl root-ca] :or {user nil pwd nil ssl false root-ca nil}}]
   ;;(println "\nGetting random members for replset " uri "\n")
-  (let [rs-members (get (run-replset-get-status uri :user user :password pwd :ssl ssl) :members)]
+  (let [rs-members (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :members)]
     ;;(println "\nWorking on member list " rs-members "\n")
     (take n (shuffle rs-members))))
 

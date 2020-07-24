@@ -37,68 +37,36 @@
 
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
-  ([rs-uri]
-   ;;(println "Checking if replica set at " rs-uri " is degraded or not")
-   (let [rs-status (get (run-replset-get-status rs-uri) :members)
-         ;;degraded  (doall (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status))]
-         degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
-     ;;(println "Degraded replica set members " degraded "\n")
-     (some true? degraded)))
-  ([rs-uri ^String user ^String pw]
-   (let [rs-status (get (run-replset-get-status rs-uri :user user :password pw) :members)
+  [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+   (let [rs-status (get (run-replset-get-status rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :read-preference (ReadPreference/primaryPreferred)) :members)
          degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
      ;;(println "\nReplica set status is " rs-status)
      ;;(println "degraded is " (some identity degraded) "\n")
-     (some true? degraded))))
+     (some true? degraded)))
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  [rs-uri num-nodes & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
-  (and (= (num-active-rs-members rs-uri :user user :pwd pw :ssl ssl) num-nodes) (some? (get-rs-primary rs-uri :user user :pw pw :ssl ssl))))
+  [rs-uri num-nodes & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  (and (= (num-active-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) num-nodes) (some? (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))))
 
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
-  ;; ([rs-uri num-mem max-retries]
-  ;;  (let [retries (atom 0)]
-  ;;    (while (and (not (replicaset-ready? rs-uri num-mem)) (< @retries max-retries))
-  ;;      (reset! retries (inc @retries))
-  ;;      (Thread/sleep 1100)
-  ;;      )
-  ;;    (< @retries max-retries)))
-  ;; ([rs-uri num-mem user pw max-retries]
-  ;;  (let [retries (atom 0)]
-  ;;    (while (and (not (replicaset-ready? rs-uri num-mem user pw)) (< @retries max-retries))
-  ;;      (reset! retries (inc @retries))
-  ;;      (Thread/sleep 1100)
-  ;;      )
-  ;;    (< @retries max-retries)))
-  [rs-uri num-mem max-retries & { :keys [ user pw ssl ] :or { user nil pw nil ssl false } }]
+  [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
    (let [retries (atom 0)]
-     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pw pw :ssl ssl)) (< @retries max-retries))
+     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca)) (< @retries max-retries))
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
        )
      (< @retries max-retries)))
 
 (defn replica-set-read-only?
-  "Check if the replica set is read only (ie, has no primary)"
-  ([rs-uri]
-   ;;(println "Trying to get primary for URI " rs-uri)
-   (let [;;primary (get-rs-primary rs-uri (ReadPreference/primaryPreferred))
-         replset (run-replset-get-status rs-uri :read-preference (ReadPreference/primaryPreferred))
-         primary (first (filter #(= (get % :stateStr) "PRIMARY") (get replset :members)))]
-     ;;(println "\nget-rs-primary for replica set " rs-uri " returned " primary "\n")
-     ;;(println "\nget-replset-status for replica set " rs-uri " returned " (get replset :members) "\n")
-     ;;(println "\nget-replset-status for replica set " rs-uri " returned " replset "\n")
-     (nil? primary)))
-  ([rs-uri ^String user ^String pw]
-   (let [mongo-uri   (make-mongo-uri rs-uri)
-         primary     (get-rs-primary mongo-uri :user user :pw pw)]
-     ;;replset     (run-replset-get-status mongo-uri user pw)]
-     ;;(println "\nget-rs-primary returned " primary "\n")
-     ;;(println "\nget-replset-status returned " (get replset :members) "\n")
-     (nil? primary))))
+  "Check if the replica set is read only by checking if it has no primary)"
+  [rs-uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } } ]
+  (let [mongo-uri   (make-mongo-uri rs-uri)
+        ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))
+        primary     (get-rs-primary mongo-uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)]
+    (nil? primary)))
   
 
 (defn shard-degraded?

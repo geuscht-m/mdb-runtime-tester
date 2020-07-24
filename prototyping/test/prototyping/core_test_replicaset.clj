@@ -44,32 +44,34 @@
 
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
-    (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+    (let [rs-uri       "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
           primary      (get (get-rs-primary rs-uri) :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries rs-uri)))]
       ;;(println "Local primary is " primary)
       ;;(println "Local secondaries are " secondaries)
+      (is (= 5 (num-active-rs-members rs-uri)))
       (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
       (is (not (some #{primary} secondaries)))
-      (is (= (count secondaries) 4)))))
+      (is (= 4 (count secondaries))))))
 
 
 (deftest test-rs-member-retrieval
   (testing "Make sure we get all the info about the replica set members"
-    (is (= (count (get-rs-secondaries "mongodb://localhost:27017")) 4))))
+    (is (= 4 (count (get-rs-secondaries "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"))))))
 
 (deftest test-get-random-members
   (testing "Try retrieving a random number of replica set members"
-    (is (= (count (get-random-members "mongodb://localhost:27017" 1)) 1))
-    (is (= (count (get-random-members "mongodb://localhost:27017" 2)) 2))
+    (is (= (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 1)) 1))
+    (is (= (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 2)) 2))
     (is (= (sort (map #(get % :name) (get-random-members "mongodb://localhost:27017" 5))) (list "localhost:27017" "localhost:27018" "localhost:27019" "localhost:27020" "localhost:27021")))))
 
 (deftest test-stepdown
   (testing "Check that stepping down the primary on an RS works"
-    (let [original-primary (get (get-rs-primary "mongodb://localhost:27017") :name)]
-      (trigger-election "mongodb://localhost:27017")
+    (let [rs-uri           "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset"
+          original-primary (get (get-rs-primary rs-uri) :name)]
+      (trigger-election rs-uri)
       (Thread/sleep 11000)
-      (is (not (= (get (get-rs-primary "mongodb://localhost:27017") :name) original-primary))))))
+      (is (not (= (get (get-rs-primary rs-uri) :name) original-primary))))))
 
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping a minority of nodes"

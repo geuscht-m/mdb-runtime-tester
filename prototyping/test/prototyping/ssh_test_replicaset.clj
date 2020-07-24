@@ -23,7 +23,7 @@
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
     (start-remote-mongods servers)
     (Thread/sleep 500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pw "pw99")
+    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99")
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
@@ -33,11 +33,11 @@
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
-    (is (not (is-mongos-process? "mongodb://rs1.mongodb.test" "admin" "pw99")))))
+    (is (not (is-mongos-process? "mongodb://rs1.mongodb.test" :user "admin" :pwd "pw99")))))
 
 (deftest test-is-mongod-process
   (testing "Check if we're running against a mongod process"
-    (is (is-mongod-process? "mongodb://rs2.mongodb.test" "admin" "pw99"))))
+    (is (is-mongod-process? "mongodb://rs2.mongodb.test" :user "admin" :pwd "pw99"))))
 
 
 ;; TODO - check why this call doesn't work against 3.6 w/ auth but does work in 4.0 w/o auth
@@ -47,8 +47,8 @@
 
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
-    (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99") :name)
-          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" :user "admin" :pw "pw99")))]
+    (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" :user "admin" :pwd "pw99") :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" :user "admin" :pwd "pw99")))]
       ;;(println "Remote primary is " primary)
       ;;(println "Remote secondaries are " secondaries)
       (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
@@ -60,10 +60,10 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user             "admin"
           pw               "pw99"
-          original-primary (get (get-rs-primary rs-uri :user user :pw pw) :name)]
+          original-primary (get (get-rs-primary rs-uri :user user :pwd pw) :name)]
       (trigger-election rs-uri :user user :pwd pw)
       (Thread/sleep 11000)
-      (is (not (= (get (get-rs-primary rs-uri :user user :pw pw) :name) original-primary))))))
+      (is (not (= (get (get-rs-primary rs-uri :user user :pwd pw) :name) original-primary))))))
 
 
 (deftest test-remote-degrade-rs
@@ -71,14 +71,14 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          restart-cmd (make-rs-degraded rs-uri :user user :password pw) ]
+          restart-cmd (make-rs-degraded rs-uri :user user :pwd pw) ]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 30000)
-      (is (replicaset-degraded? rs-uri user pw))
+      (is (replicaset-degraded? rs-uri :user user :pwd pw))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 8000)
-      (is (not (replicaset-degraded? rs-uri user pw))))))
+      (is (not (replicaset-degraded? rs-uri :user user :pwd pw))))))
     
 (deftest test-remote-read-only-rs
   (testing "Check that we are able to successfully make a replica set read only
@@ -86,11 +86,11 @@
     (let [rs-uri "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           user   "admin"
           pw     "pw99"
-          restart-cmd (make-rs-read-only rs-uri :user user :pw pw)]
+          restart-cmd (make-rs-read-only rs-uri :user user :pwd pw)]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 20000)
       (is (= (num-active-rs-members rs-uri :user user :pwd pw) 1))
-      (is (replica-set-read-only? rs-uri user pw))
+      (is (replica-set-read-only? rs-uri :user user :pwd pw))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
@@ -103,14 +103,15 @@
     (let [rs-uri  "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           uri     "mongodb://rs1.mongodb.test:27017"
           user    "admin"
-          pwd     "pw99"
-          cmdline (kill-mongo-process uri :user user :pwd pwd)]
-      (is (not (nil? cmdline)))
-      (Thread/sleep 12000)
-      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 2))
-      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
-      (Thread/sleep 7000)
-      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 3))
+          pwd     "pw99"]
+      (is (= 3 (num-active-rs-members rs-uri :user user :pwd pwd)))
+      (let [cmdline (kill-mongo-process uri :user user :pwd pwd)]
+        (is (not (nil? cmdline)))
+        (Thread/sleep 12000)
+        (is (= 2 (num-active-rs-members rs-uri :user user :pwd pwd)))
+        (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+        (Thread/sleep 7000)
+        (is (= 3 (num-active-rs-members rs-uri :user user :pwd pwd))))
       )))
 
 (deftest test-crash-mongo-process
@@ -118,15 +119,16 @@
     (let [rs-uri  "mongodb://rs1.mongodb.test,rs2.mongodb.test,rs3.mongodb.test/?replicaSet=replTest"
           uri     "mongodb://rs3.mongodb.test"
           user    "admin"
-          pwd     "pw99"
-          cmdline (kill-mongo-process uri :force true :user user :pwd pwd)]
-      (is (not (nil? cmdline)))
-      (Thread/sleep 15000)
-      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 2))
-      (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
-      (Thread/sleep 5000)
-      (is (= (num-active-rs-members rs-uri :user user :pwd pwd) 3))
-      )))
+          pwd     "pw99"]
+      (is (= 3 (num-active-rs-members rs-uri :user user :pwd pwd)))
+      (let [cmdline (kill-mongo-process uri :force true :user user :pwd pwd)]
+        (is (not (nil? cmdline)))
+        (Thread/sleep 15000)
+        (is (= 2 (num-active-rs-members rs-uri :user user :pwd pwd)))
+        (start-mongo-process (get cmdline :uri) (get cmdline :cmd-line))
+        (Thread/sleep 5000)
+        (is (= 3 (num-active-rs-members rs-uri :user user :pwd pwd)))
+      ))))
 
 (deftest test-remote-simulate-maintenance
   (testing "Test that the simulate-maintenance function correct does a rolling restart and works with authentication"
@@ -134,6 +136,7 @@
           user   "admin"
           pw     "pw99"
           num-mongods (num-active-rs-members rs-uri :user user :pwd pw)]
-      (simulate-maintenance rs-uri :user user :pw pw)
+      (is (= num-mongods (num-active-rs-members rs-uri :user user :pwd pw)))
+      (simulate-maintenance rs-uri :user user :pwd pw)
       (Thread/sleep 15000)
-      (is (= (num-active-rs-members rs-uri :user user :pwd pw) num-mongods)))))
+      (is (= num-mongods (num-active-rs-members rs-uri :user user :pwd pw))))))

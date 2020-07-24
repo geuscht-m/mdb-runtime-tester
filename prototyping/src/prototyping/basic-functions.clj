@@ -24,9 +24,9 @@
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
-  [uri & { :keys [force ^String user ^String pwd ssl] :or { force false user nil pwd nil ssl false } }]
-  ;;(println "Stopping process at " uri " with user " user " and password " pwd)
-  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :username user :password pwd :ssl ssl) :argv) })
+  [uri & { :keys [force ^String user ^String pwd ssl root-ca] :or { force false user nil pwd nil ssl false root-ca nil } }]
+  (println "Stopping process at " uri " with user " user " and password " pwd ", root-ca " root-ca)
+  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca) :argv) })
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -38,17 +38,19 @@
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
-  [uri & { :keys [user password ssl] :or { user nil password nil ssl false}}]
-  ;;(println "Restarting mongo process on " uri " with username " user " and password " password)
-  (let [mongo-parameters (stop-mongo-process uri :user user :pwd password :ssl ssl)]
+  [uri & { :keys [user pwd ssl] :or { user nil pwd nil ssl false}}]
+  ;;(println "Restarting mongo process on " uri " with username " user " and password " pwd)
+  (let [mongo-parameters (stop-mongo-process uri :user user :pwd pwd :ssl ssl)]
     ;;(println "Restarting mongo process at uri " uri " with parameters " mongo-parameters)
     (start-mongo-process (get mongo-parameters :uri) (get mongo-parameters :cmd-line))))
 
 (defn stepdown-primary
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
-  [uri & { :keys [user password ssl] :or { user nil password nil ssl false}}]
-  (let [primary (get (get-rs-primary uri :user user :pw password :ssl ssl) :name)]
-    (run-replset-stepdown (make-mongo-uri primary) :user user :password password :ssl ssl )))
+  [uri & { :keys [user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil}}]
+  (let [primary (get (get-rs-primary uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :name)
+        ssl-enabled (or ssl (.contains uri "ssl=true"))]
+    (println "Trying to step down primary " primary " on replica set " uri ", root-ca " root-ca)
+    (run-replset-stepdown (make-mongo-uri primary) :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)))
 
 (defn start-rs-nodes
   "Takes a list of URIs for mongod/mongos that need to be started"

@@ -113,6 +113,7 @@
           restart     (make-sharded-cluster-read-only cluster-uri)]
       ;;(println "\nHigh level shard list " shard-list)
       ;;(println "Is shard-list a seq " (seq? shard-list) "\n")
+      (is (not (nil? restart)))
       (Thread/sleep 15000)
       ;;(println "shards-read-only? first invocation is " (shards-read-only? shard-list))
       (is (shards-read-only? shard-list))
