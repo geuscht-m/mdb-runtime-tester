@@ -34,6 +34,7 @@
     (Thread/sleep 500)))
 
 (defn wrap-sharded-tests [f]
+  (is (= (num-running-mongo-processes) 0))
   (control-sharded-cluster "start")
   (Thread/sleep 500)
   (if (wait-test-cluster-ready)

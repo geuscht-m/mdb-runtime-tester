@@ -140,9 +140,10 @@
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
   [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
-  (let [ssl-enabled (or ssl (.contains uri "ssl=true"))
-        members     (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl-enabled :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) :members)
+  (let [members        (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) :members)
         active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
+    ;;(println "num-active-members - count is " (count active-members))
+    ;;(println "num-active-members - active-members is " active-members) 
     (count active-members)))
 
 (defn is-local-process?

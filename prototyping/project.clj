@@ -6,7 +6,8 @@
   :plugins [[lein-voom "0.1.0-20190525_204305-g28f604d"]
             [lein-eftest "0.5.9"]]
   :dependencies [[org.clojure/clojure           "1.10.0"]
-                 [org.mongodb/mongo-java-driver "3.11.2"]
+                 ;; TODO: Update to mongo-driver-sync
+                 [org.mongodb/mongo-java-driver "3.12.6"]
                  [clojurewerkz/urly             "1.0.0"]
                  [com.taoensso/timbre           "4.10.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre     "0.3.14"] ;; Attempt to send all log output through timbre

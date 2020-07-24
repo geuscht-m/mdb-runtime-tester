@@ -20,6 +20,7 @@
 
 (defn- wrap-rs-tests
   [f]
+  (is (= (num-running-mongo-processes) 0))
   (control-test-rs "start")
   (Thread/sleep 500)
   (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 17)
@@ -48,7 +49,7 @@
           primary      (get (get-rs-primary rs-uri) :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries rs-uri)))]
       ;;(println "Local primary is " primary)
-      ;;(println "Local secondaries are " secondaries)
+      (println "Topology - secondaries are " secondaries)
       (is (= 5 (num-active-rs-members rs-uri)))
       (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
       (is (not (some #{primary} secondaries)))
@@ -61,8 +62,8 @@
 
 (deftest test-get-random-members
   (testing "Try retrieving a random number of replica set members"
-    (is (= (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 1)) 1))
-    (is (= (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 2)) 2))
+    (is (= 1 (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 1))))
+    (is (= 2 (count (get-random-members "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" 2))))
     (is (= (sort (map #(get % :name) (get-random-members "mongodb://localhost:27017" 5))) (list "localhost:27017" "localhost:27018" "localhost:27019" "localhost:27020" "localhost:27021")))))
 
 (deftest test-stepdown
