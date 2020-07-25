@@ -8,7 +8,7 @@
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[clj-ssh.ssh :as ssh])
-(import  [com.mongodb ServerAddress MongoClientOptions MongoClientOptions$Builder ReadPreference]
+(import  [com.mongodb ReadPreference]
          [com.mongodb.client MongoClient])
 
 
