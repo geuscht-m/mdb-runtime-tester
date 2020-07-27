@@ -39,6 +39,10 @@
   (testing "Check if we're running against a mongod process"
     (is (is-mongod-process? "mongodb://rs2.mongodb.test" :user "admin" :pwd "pw99"))))
 
+(deftest test-is-sharded
+  (testing "Are we connected to a sharded cluster"
+    (is (not (is-sharded-cluster? "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest" :user "admin" :pwd "pw99")))))
+
 
 ;; TODO - check why this call doesn't work against 3.6 w/ auth but does work in 4.0 w/o auth
 ;; (deftest test-is-sharded

@@ -34,7 +34,7 @@
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
   [uri & { :keys [ username password ssl root-ca ] :or { username nil password nil ssl false root-ca nil} } ]
-  (let [conn       (md/mdb-connect uri :user username :pwd password :ssl ssl)
+  (let [conn       (md/mdb-connect uri :user username :pwd password :ssl ssl :root-ca root-ca)
         shard-list (md/mdb-admin-command conn { :listShards 1 })]
     (md/mdb-disconnect conn)
     shard-list))
@@ -53,8 +53,8 @@
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
-  [uri]
-  (let [conn       (md/mdb-connect uri)
+  [uri & {:keys [user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil}}]
+  (let [conn       (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
         shard-map  (md/mdb-admin-command conn { :getShardMap 1 })]
     (md/mdb-disconnect conn)
     shard-map))
@@ -234,23 +234,16 @@
 
 (defn get-random-shards
   "Returns a list of n random shards from the sharded cluster referenced by the uri"
-  ([uri n]
-   (let [shards (get (run-listshards uri) :shards)]
-     (take n (shuffle shards))))
-  ([uri n ^String username ^String password]
-   (let [shards (get (run-listshards uri username password) :shards)]
-     (take n (shuffle shards)))))
+  [uri n & {:keys [user pwd ssl root-ca] :or {user nil pwd nil ssl false root-ca nil}}]
+  (let [shards (get (run-listshards uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :shards)]
+    (take n (shuffle shards))))
 
 (defn get-config-servers-uri
   "Given a sharded cluster, returns the URI needed to connect to the config servers"
-  ([cluster-uri]
-   (let [shard-map (run-get-shard-map cluster-uri)]
-     ;;(println shard-map)
-     (str/split (get (get shard-map :map) :config) #",")))
-  ([cluster-uri ^String username ^String password]
-   (let [shard-map (run-get-shard-map cluster-uri username password)]
-     ;;(println shard-map)
-     (str/split (get (get shard-map :map) :config) #","))))
+  [cluster-uri & {:keys [user pwd ssl root-ca] :or {user nil pwd nil ssl false root-ca nil}}]
+  (let [shard-map (run-get-shard-map cluster-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)]
+    ;;(println shard-map)
+    (str/split (get (get shard-map :map) :config) #",")))
 
 (defn- convert-shard-uri
   [from-list-shards]
@@ -262,14 +255,10 @@
    cluster-uri _must_ point to the mongos for correct discovery.
    Note that listShards returns the shard replsets in a different format
    so we have to transform them before returning the list"
-  ([cluster-uri]
+  [cluster-uri & {:keys [user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil}}]
   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
-   (let [shard-configs (run-listshards cluster-uri)]
-     (map #(convert-shard-uri (get % :host)) (get shard-configs :shards))))
-  ([cluster-uri ^String username ^String password]
-   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
-   (let [shard-configs (run-listshards cluster-uri username password)]
-     (map #(get % :host) (get shard-configs :shards)))))
+  (let [shard-configs (run-listshards cluster-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)]
+    (map #(convert-shard-uri (get % :host)) (get shard-configs :shards))))
 
 
 (defn not-expired?
@@ -279,19 +268,13 @@
 
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
-  ([uri]
-   (try
-     (let [shard-uris (get-shard-uris uri)] 
-       (not (empty? shard-uris)))
-     (catch com.mongodb.MongoCommandException e
-       ;; Note - add log output just in case
-       nil)))
-  ([uri ^String user ^String pw]
-   (try
-     (let [shard-uris (get-shard-uris uri user pw)]
-       (not (empty? shard-uris)))
-     (catch com.mongodb.MongoCommandException e
-       nil))))
+  [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  (try
+    (let [shard-uris (get-shard-uris uri :user user :pwd pwd :ssl ssl :root-ca root-ca)] 
+      (not (empty? shard-uris)))
+    (catch com.mongodb.MongoCommandException e
+      ;; Note - add log output just in case
+      nil)))
 
 (defn undo-operation
   "On functions that return a closure, execute the closure"
