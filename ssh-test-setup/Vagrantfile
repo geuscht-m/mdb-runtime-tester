@@ -72,9 +72,11 @@ Vagrant.configure("2") do |config|
       node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-ssl/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data-ssl/keyfile ; chmod 600 /home/vagrant/data-ssl/keyfile"
-      node.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
+      #node.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
+      node.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
       node.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
-      node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
+      #node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
+      node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
       node.vm.provision "shell", inline: 'sudo yum install -y mongodb-org'
       node.vm.provision "shell", inline: <<-SSHD_CONFIG
         sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -113,8 +115,10 @@ Vagrant.configure("2") do |config|
     fi
     LEIN_INSTALL
     tester.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
-    tester.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
-    tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
+    #tester.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
+    tester.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
+    #tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
+    tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
     tester.vm.provision "shell", inline: 'sudo yum install -y mongodb-org'
     tester.vm.provision "shell", inline: "mkdir -p git-repo/mdb-runtime-tester"
     tester.vm.provision "hosts", :sync_hosts => true
