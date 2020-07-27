@@ -23,11 +23,12 @@
 
 ;; Local helper functions, not exposed to other namespaces
 
-(defn- run-serverstatus
+(defn- run-server-status
   [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} } ]
-  (let [conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+  (let [conn          (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca) uri)
         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-    (md/mdb-disconnect conn)
+    (if (= (type uri) String)
+      (md/mdb-disconnect conn))
     server-status))
 
 (defn- run-listshards
@@ -42,10 +43,12 @@
   "Returns the result of Mongodb's replSetGetStatus admin command"
   [uri & { :keys [ read-preference user pwd ssl root-ca ] :or { read-preference nil user nil pwd nil ssl false root-ca nil} } ]
   ;;(println "Trying to run replset-get-status on " uri " with user " user " and password " pwd)
-  (let [ssl-enabled    (or ssl (.contains uri "ssl=true"))
-        conn           (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)
+  ;;(println "URI type is " (type uri))
+  (let [conn           (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca) uri)
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
-    (md/mdb-disconnect conn)
+    (if (= (type uri) String)
+      (md/mdb-disconnect conn))
+    ;;(println "Returning status " replset-status)
     replset-status))
 
 (defn- run-get-shard-map
@@ -106,19 +109,19 @@
   [^MongoClient conn]
   (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
 
-(defn- run-server-status
-  "Run the serverStatus command and return the result as a map"
-  [^MongoClient conn]
-  (md/mdb-admin-command conn { :serverStatus 1 }))
+;; (defn- run-server-status
+;;   "Run the serverStatus command and return the result as a map"
+;;   [^MongoClient conn]
+;;   (md/mdb-admin-command conn { :serverStatus 1 }))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
 (defn- get-rs-members-by-state
   [uri state & { :keys [ user pwd read-pref ssl root-ca ] :or { user nil pwd nil read-pref nil ssl false root-ca nil} } ]
-  (let [rs-state (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca)]
-    ;;(println rs-state "\n")
-    (filter #(= (get % :stateStr) state) (get rs-state :members))))
+  (let [member-state (get (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca) :members)]
+    (println " get-member-by state " state " returned: " member-state "\n")
+    (filter #(= (get % :stateStr) state) member-state)))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -140,11 +143,10 @@
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
   [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
-  (let [members        (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) :members)
-        active-members (filter #(or (= (get % :stateStr) "PRIMARY") (= (get % :stateStr) "SECONDARY")) members)]
-    ;;(println "num-active-members - count is " (count active-members))
-    ;;(println "num-active-members - active-members is " active-members) 
-    (count active-members)))
+  (let [ result (run-replset-get-status uri :user user :pwd pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) ]
+    (println "num-active result for uri " uri " is " result)
+    ;;(println "Active members is " (get result :members))
+    (count (filter #(let [state (get % :stateStr)] (or (= state "PRIMARY") (= state "SECONDARY"))) (get result :members)))))
 
 (defn is-local-process?
   "Check if the mongo process referenced by the URI is local or not"
@@ -160,7 +162,7 @@
   (if (= (type uri) String)
       (let [ssl-enabled (or ssl (.contains uri "ssl=true"))]
       ;;(get-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
-        (get (run-serverstatus uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca) :process))
+        (get (run-server-status uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca) :process))
       (first uri)))
 
 (defn is-mongod-process?

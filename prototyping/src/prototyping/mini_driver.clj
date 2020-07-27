@@ -3,7 +3,7 @@
 (require          '[prototyping.conv-helpers :as pcv]
                   '[clojure.string           :as str])
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
-        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block]
+        [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block MongoCommandException]
         [com.mongodb.connection SslSettings]
         [javax.net.ssl SSLContext TrustManagerFactory]
         [java.security KeyStore]
@@ -145,31 +145,43 @@
   [^MongoClient conn]
   (.close conn))
 
+(defn- mdb-exec-command
+  "Helper function for mdb-run-command. Mainly useful in case we have
+   to try and re-run the command from the error handler in mdb-run-command"
+  [db command readPreference]
+  ;;(println "Running command " command " on db " db " with readPreference " readPreference)
+  (if (nil? readPreference)
+                     (.runCommand db (pcv/to-bson-document command))
+                     (.runCommand db (pcv/to-bson-document command) readPreference)))
+
 (defn mdb-run-command
   "Run a MongoDB command against the database <db-name> and return the result
    as a map"
   [^MongoClient conn ^String dbname command & { :keys [ readPreference ] :or { readPreference nil } }]
-  (if (nil? readPreference)
-   (-> (.getDatabase conn dbname)
-       (.runCommand (pcv/to-bson-document command))
-       (pcv/from-bson-document ,, true))
-   (-> (.getDatabase conn dbname)
-       (.runCommand (pcv/to-bson-document command) readPreference)
-       (pcv/from-bson-document ,, true))))
-
-;; (defn mdb-run-command
-;;   "Run a MongoDB command against a database"
-;;   ([^MongoClient conn ^String dbname command]
-;;    ;;(pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command)) true))
-;;   ([^MongoClient conn ^String dbname command ^ReadPreference pref]
-;;    ;;(println "Running command " command " with read preference " pref)
-;;    (pcv/from-bson-document (.runCommand (.getDatabase conn dbname) (pcv/to-bson-document command) pref) true)))
+  ;;(println "Running command " command " on connection " conn)
+  (let [db  (.getDatabase conn dbname)]
+    (try
+      (pcv/from-bson-document (mdb-exec-command db command readPreference) true)
+      (catch MongoCommandException e
+        ;;(println "Received exception " e)
+        (if (= (.getErrorCode e) 211)
+          ((println "Received 'KeyNotFound' exception, retrying command " command " once more on database " db)
+           (Thread/sleep 150)
+           (let [result (mdb-exec-command db command readPreference)]
+             (println "Result of retried call is " result)
+             (let [converted (pcv/from-bson-document result true)]
+               (println "Converted result is " converted)
+               converted)))
+          ((println "Received MongoCommandException " e)
+           (throw e)))))))
 
 (defn mdb-admin-command
   "Run a MongoDB command against the admin database"
   [^MongoClient conn command & { :keys [ readPreference ] :or { readPreference nil }}]
   ;;(println "Running admin command " command " on connection " conn)
-  (mdb-run-command conn "admin" command :readPreference readPreference))
+  (let [result (mdb-run-command conn "admin" command :readPreference readPreference)]
+    ;;(println "Returning result " result)
+    result))
 
 (defn ^MongoDatabase mdb-get-database
   "Get a database with the name [db-name] from the MongoClient object"

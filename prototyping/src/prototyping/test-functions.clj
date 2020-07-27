@@ -8,8 +8,10 @@
 (defn simulate-maintenance
   "Simulate maintenance/rolling mongod bounce on a replica set. Fails if the RS URI doesn't point to a valid RS"
   [rs-uri & { :keys [ user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil} }]
-  (let [primary     (get (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :name)
-        secondaries (doall (map #(get % :name) (get-rs-secondaries rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)))]
+  (let [conn        (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+        primary     (get (get-rs-primary conn) :name)
+        secondaries (doall (map #(get % :name) (get-rs-secondaries conn)))]
+    (md/mdb-disconnect conn)
     ;;(println "Primary is " primary ", secondaries are " secondaries)
     (doall (map #(restart-mongo-process (make-mongo-uri %) :user user :pwd pwd :ssl ssl :root-ca root-ca) secondaries))
     ;;(stepdown-primary rs-uri :user user :password pw)

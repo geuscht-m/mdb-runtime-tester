@@ -1,6 +1,7 @@
 (ns prototyping.test-helpers
   (:require [prototyping.core :refer :all]
             [prototyping.sys-helpers :refer :all]
+            [prototyping.mini-driver :as md :refer :all]
             [clj-ssh.ssh :as ssh :refer :all])
   (:import  [com.mongodb ReadPreference]))
 
@@ -47,8 +48,14 @@
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
   [rs-uri num-nodes & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
-  (and (= (num-active-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) num-nodes)
-       (some? (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))))
+  (let [conn (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+        num-active (num-active-rs-members conn)
+        primary    (get-rs-primary conn)]
+    (md/mdb-disconnect conn)
+    (and (= num-active num-active)
+         (some? primary))))
+  ;; (and (= (num-active-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) num-nodes)
+  ;;      (some? (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))))
 
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
@@ -56,9 +63,11 @@
   [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
    (let [retries (atom 0)]
      (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca)) (< @retries max-retries))
+       (println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
        )
+     ;;(Thread/sleep 750)
      (< @retries max-retries)))
 
 (defn replica-set-read-only?

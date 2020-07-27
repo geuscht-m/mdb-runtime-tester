@@ -33,8 +33,11 @@
     ;;(println "Waiting for test processes to shut down")
     (Thread/sleep 500)))
 
-(defn wrap-sharded-tests [f]
-  (is (= (num-running-mongo-processes) 0))
+(defn wrap-sharded-tests
+  "Intialisation wrapper for test runner, executed for every test.
+   Tries to provide sane environment"
+  [f]
+  (is (= 0 (num-running-mongo-processes)))
   (control-sharded-cluster "start")
   (Thread/sleep 500)
   (if (wait-test-cluster-ready)
