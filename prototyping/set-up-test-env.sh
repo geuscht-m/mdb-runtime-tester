@@ -19,14 +19,14 @@ mlaunch init --single --dir $HOME/tmp/mdb-test/single
 mlaunch stop --dir $HOME/tmp/mdb-test/single
 sleep 5s
 
-mlaunch init --replicaset --nodes 5 --dir $HOME/tmp/mdb-test/replica
+mlaunch init --replicaset --nodes 5 --dir $HOME/tmp/mdb-test/replica --wiredTigerCacheSizeGB 0.1
 sleep 10s
 mongo "mongodb://localhost/?replicaSet=replset" config-timeouts.js
 mlaunch stop --dir $HOME/tmp/mdb-test/replica
 
 sleep 5s
 
-mlaunch init --replicaset --nodes 3 --shards 3 --config 3 --dir $HOME/tmp/mdb-test/sharded
+mlaunch init --replicaset --nodes 3 --shards 3 --config 3 --dir $HOME/tmp/mdb-test/sharded --wiredTigerCacheSizeGB 0.1
 sleep 30s
 mongo "mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=shard01" config-timeouts.js
 mongo "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02" config-timeouts.js
