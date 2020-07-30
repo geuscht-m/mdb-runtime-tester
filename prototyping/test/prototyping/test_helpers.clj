@@ -63,7 +63,7 @@
   [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
    (let [retries (atom 0)]
      (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca)) (< @retries max-retries))
-       (println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
+       ;;(println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
        )

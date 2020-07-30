@@ -22,7 +22,8 @@
   []
   (let [proc-list (sh "ps" "ax" "-o" "pid=" "-o" "command=")]
     (doall (map #(parse-ps-output %) (clojure.string/split-lines (get proc-list :out))))))
-
+  
+   
 ;; NOTE - this code can be improved by using the ProcessHandle API on Java 9+
 ;;        As it is written, this code also works with Java 8.
 (defn get-process-list

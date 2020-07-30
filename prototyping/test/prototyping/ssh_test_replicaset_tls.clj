@@ -7,7 +7,8 @@
 (ns prototyping.ssh-test-replicaset-tls
   (:require [clojure.test :refer :all]
             [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]))
+            [prototyping.test-helpers :refer :all]
+            [prototyping.mini-driver :as md :refer :all]))
 
 (defn- start-remote-mongods
   [servers]
@@ -21,12 +22,12 @@
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
     (start-remote-mongods servers)
-    (Thread/sleep 500)
+    (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&ssl=true" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
-    (Thread/sleep 1000)))
+    (Thread/sleep 500)))
 
 (use-fixtures :each ssh-test-fixture)
 
@@ -47,8 +48,10 @@
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [rs-uri       "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&ssl=true"
-          primary      (get (get-rs-primary rs-uri :user "admin" :pwd "pw99" :root-ca "../../../tls/root.crt") :name)
-          secondaries  (sort (map #(get % :name) (get-rs-secondaries rs-uri :user "admin" :pwd "pw99" :root-ca "../../../tls/root.crt")))]
+          conn         (md/mdb-connect rs-uri :user "admin" :pwd "pw99" :root-ca "../../../tls/root.crt")
+          primary      (get (get-rs-primary conn) :name)
+          secondaries  (sort (map #(get % :name) (get-rs-secondaries conn)))]
+      (md/mdb-disconnect conn)
       ;;(println "Remote primary is " primary)
       ;;(println "Remote secondaries are " secondaries)
       (is (not (nil? (re-matches #"rs[1-3].mongodb.test:28017" primary))))

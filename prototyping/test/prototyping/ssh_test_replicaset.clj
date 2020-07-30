@@ -22,12 +22,12 @@
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
     (start-remote-mongods servers)
-    (Thread/sleep 500)
+    (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99")
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
-    (Thread/sleep 1000)))
+    (Thread/sleep 650)))
 
 (use-fixtures :each ssh-test-fixture)
 

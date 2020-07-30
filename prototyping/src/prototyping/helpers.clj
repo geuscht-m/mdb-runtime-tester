@@ -120,19 +120,19 @@
 (defn- get-rs-members-by-state
   [uri state & { :keys [ user pwd read-pref ssl root-ca ] :or { user nil pwd nil read-pref nil ssl false root-ca nil} } ]
   (let [member-state (get (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca) :members)]
-    (println " get-member-by state " state " returned: " member-state "\n")
+    ;;(println " get-member-by state " state " returned: " member-state "\n")
     (filter #(= (get % :stateStr) state) member-state)))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri & { :keys [ read-pref user pwd ssl root-ca] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil}}]
-  (println "Getting primary for rs " uri " with user " user ", root-ca " root-ca " and password " pwd)
+  ;;(println "Getting primary for rs " uri " with user " user ", root-ca " root-ca " and password " pwd)
   (first (get-rs-members-by-state uri "PRIMARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca)))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
   [uri & { :keys [ read-pref user pwd ssl root-ca ] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil}}]
-  (println "Getting secondary for rs " uri ", user " user ", root-ca " root-ca)
+  ;;(println "Getting secondary for rs " uri ", user " user ", root-ca " root-ca)
   (get-rs-members-by-state uri "SECONDARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca))
 
 (defn get-num-rs-members
@@ -144,7 +144,7 @@
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
   [uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
   (let [ result (run-replset-get-status uri :user user :pwd pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca) ]
-    (println "num-active result for uri " uri " is " result)
+    ;;(println "num-active result for uri " uri " is " result)
     ;;(println "Active members is " (get result :members))
     (count (filter #(let [state (get % :stateStr)] (or (= state "PRIMARY") (= state "SECONDARY"))) (get result :members)))))
 

@@ -25,8 +25,8 @@
   [f]
   (is (= 0 (num-running-mongo-processes)))
   (control-test-rs "start")
-  (Thread/sleep 500)
-  (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 17)
+  (Thread/sleep 1500)
+  (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 19)
     (f)
     (println "Test replica set not ready in time"))
   (control-test-rs "stop")
@@ -83,7 +83,7 @@
 (deftest test-degraded-rs
   (testing "Check that we can successfully degrade an RS by stopping a minority of nodes"
     (let [rs-uri      "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset"
-          restart-cmd (make-rs-degraded "mongodb://localhost:27017") ]
+          restart-cmd (make-rs-degraded rs-uri) ]
       (is (not (nil? restart-cmd)))
       ;; NOTE: Unfortunately this test is rather timing sensitive at the moment,
       ;;       hence the various sleeps
@@ -140,6 +140,7 @@
   (testing "Test that the simulate-maintenance function correct does a rolling restart"
     (let [rs-uri "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset"
           num-mongods (num-active-rs-members rs-uri)]
+      (is (= 5 num-mongods))
       (simulate-maintenance rs-uri)
       (Thread/sleep 15000)
       (is (= num-mongods (num-active-rs-members rs-uri))))))

@@ -14,7 +14,7 @@
   "Create an SSLContext for use by the driver using a supplied
    root CA file. Needed for untrusted and self-signed certificates"
   [root-ca-file]
-  (println "Building SSLContext from root certificate file " root-ca-file)
+  ;;(println "Building SSLContext from root certificate file " root-ca-file)
   (let [is (FileInputStream. root-ca-file)
         cf (CertificateFactory/getInstance "X.509")
         ca-cert (.generateCertificate cf is)]
@@ -116,7 +116,7 @@
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
   ;;(println "Attempting to connect to " mongo-uri)
-  (println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
+  ;;(println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
   (if (or (nil? auth-method) (str/starts-with? auth-method "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
     ;; encoded in the URI connection string

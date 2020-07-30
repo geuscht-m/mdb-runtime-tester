@@ -25,7 +25,7 @@
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
   [uri & { :keys [force ^String user ^String pwd ssl root-ca] :or { force false user nil pwd nil ssl false root-ca nil } }]
-  (println "Stopping process at " uri " with user " user " and password " pwd ", root-ca " root-ca)
+  ;;(println "Stopping process at " uri " with user " user " and password " pwd ", root-ca " root-ca)
   { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca) :argv) })
 
 (defn kill-mongo-process
