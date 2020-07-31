@@ -16,7 +16,7 @@
                  [clj-ssh                       "0.5.14"]  ;; SSH client for remote execution
                  [net.n01se/clojure-jna         "1.0.0"]]  ;; JNA interface to native libraries
   :eftest { :multithread? false
-           :test-warn-time 5000 }
-  :main prototyping.core
+           :test-warn-time 20000 }
+  :main tester-core.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

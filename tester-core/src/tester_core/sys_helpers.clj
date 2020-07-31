@@ -1,4 +1,4 @@
-(ns prototyping.sys-helpers
+(ns tester-core.sys-helpers
   (:require [clojure.java.shell :refer [sh]]))
 
 (defn get-os-type

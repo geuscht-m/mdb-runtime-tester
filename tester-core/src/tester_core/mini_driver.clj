@@ -1,6 +1,6 @@
-(ns prototyping.mini-driver)
+(ns tester-core.mini-driver)
 ;;(import [com.mongodb ServerAddress MongoClient MongoClientOptions MongoClientOptions$Builder ReadPreference])
-(require          '[prototyping.conv-helpers :as pcv]
+(require          '[tester-core.conv-helpers :as pcv]
                   '[clojure.string           :as str])
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
         [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block MongoCommandException]

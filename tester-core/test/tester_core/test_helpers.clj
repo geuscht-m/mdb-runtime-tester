@@ -1,7 +1,7 @@
-(ns prototyping.test-helpers
-  (:require [prototyping.core :refer :all]
-            [prototyping.sys-helpers :refer :all]
-            [prototyping.mini-driver :as md :refer :all]
+(ns tester-core.test-helpers
+  (:require [tester-core.core :refer :all]
+            [tester-core.sys-helpers :refer :all]
+            [tester-core.mini-driver :as md :refer :all]
             [clj-ssh.ssh :as ssh :refer :all])
   (:import  [com.mongodb ReadPreference]))
 

@@ -1,9 +1,9 @@
-(ns prototyping.core-test-replicaset
+(ns tester-core.core-test-replicaset
   (:require [clojure.test :refer :all]
-            [prototyping.core :refer :all]
-            [prototyping.sys-helpers :refer :all]
-            [prototyping.test-helpers :refer :all]
-            [prototyping.mini-driver :as md :refer :all]
+            [tester-core.core :refer :all]
+            [tester-core.sys-helpers :refer :all]
+            [tester-core.test-helpers :refer :all]
+            [tester-core.mini-driver :as md :refer :all]
             [clojure.java.shell :refer [sh]]))
 
 (defn- control-test-rs

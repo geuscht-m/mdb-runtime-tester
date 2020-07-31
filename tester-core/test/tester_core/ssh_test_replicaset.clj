@@ -5,10 +5,10 @@
 ;;       It requires a replica set on three hosts,
 ;;       rs[1-3].mongodb.test, running on default
 ;;       ports
-(ns prototyping.ssh-test-replicaset
+(ns tester-core.ssh-test-replicaset
   (:require [clojure.test :refer :all]
-            [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]))
+            [tester-core.core :refer :all]
+            [tester-core.test-helpers :refer :all]))
 
 (defn- start-remote-mongods
   [servers]
