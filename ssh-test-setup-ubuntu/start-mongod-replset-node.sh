@@ -1,0 +1,1 @@
+../ssh-test-setup/start-mongod-replset-node.sh
