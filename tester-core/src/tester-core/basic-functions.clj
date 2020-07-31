@@ -1,4 +1,4 @@
-(in-ns 'prototyping.core)
+(in-ns 'tester-core.core)
 
 (defn start-mongos-process
   [uri mongos-parameters]

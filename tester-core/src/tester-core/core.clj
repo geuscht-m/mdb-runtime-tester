@@ -1,4 +1,4 @@
-(ns prototyping.core
+(ns tester-core.core
   (:gen-class :main true))
 
 (load "helpers")

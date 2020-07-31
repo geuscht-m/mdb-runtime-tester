@@ -1,6 +1,6 @@
-(ns prototyping.core-test
+(ns tester-core.core-test
   (:require [clojure.test :refer :all]
-            [prototyping.core :refer :all]
+            [tester-core.core :refer :all]
             [taoensso.timbre :as timbre]))
 
 (timbre/merge-config!

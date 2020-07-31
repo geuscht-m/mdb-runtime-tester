@@ -4,11 +4,11 @@
 ;;       It will start and stop the replica set as needed, but the
 ;;       configuration and binaries have to be in place
 
-(ns prototyping.ssh-test-replicaset-tls
+(ns tester-core.ssh-test-replicaset-tls
   (:require [clojure.test :refer :all]
-            [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]
-            [prototyping.mini-driver :as md :refer :all]))
+            [tester-core.core :refer :all]
+            [tester-core.test-helpers :refer :all]
+            [tester-core.mini-driver :as md :refer :all]))
 
 (defn- start-remote-mongods
   [servers]

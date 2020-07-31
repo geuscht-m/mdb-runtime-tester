@@ -1,5 +1,5 @@
-(ns prototyping.sys-helpers-test
-  (:require [prototyping.sys-helpers :refer :all]
+(ns tester-core.sys-helpers-test
+  (:require [tester-core.sys-helpers :refer :all]
             [clojure.test :refer :all]
             [clojure.pprint :refer :all]))
 

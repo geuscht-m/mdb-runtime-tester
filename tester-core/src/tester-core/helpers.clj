@@ -1,10 +1,10 @@
 ;; Helper functions for Mongodb discovery mechanisms
 
-(in-ns 'prototyping.core)
+(in-ns 'tester-core.core)
 (require '[clojure.string :as str]
-         '[prototyping.conv-helpers :as pcv]
-         '[prototyping.mini-driver :as md]
-         '[prototyping.os-helpers :as os]
+         '[tester-core.conv-helpers :as pcv]
+         '[tester-core.mini-driver :as md]
+         '[tester-core.os-helpers :as os]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[clj-ssh.ssh :as ssh])

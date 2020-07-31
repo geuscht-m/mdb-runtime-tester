@@ -1,14 +1,13 @@
 ;; NOTE - duplicated from my hacked monger fork - needed internally here
 ;;        replace when possible
 ;;
-(ns prototyping.conv-helpers
-   (:import [com.mongodb DBObject BasicDBObject BasicDBList]
-           [com.mongodb.client MongoCursor]
-           [clojure.lang IPersistentMap Named Keyword Ratio]
-           [java.util List Map Date Set]
-           org.bson.Document
-           org.bson.types.ObjectId
-           (org.bson.types Decimal128)))
+(ns tester-core.conv-helpers
+   (:import [com.mongodb.client MongoCursor]
+            [clojure.lang IPersistentMap Named Keyword Ratio]
+            [java.util List Map Date Set]
+            org.bson.Document
+            org.bson.types.ObjectId
+            (org.bson.types Decimal128)))
 
 
 (defprotocol ConvertToBSONDocument

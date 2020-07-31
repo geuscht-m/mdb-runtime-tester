@@ -1,6 +1,6 @@
 ;; Basic helper functions needed for OS interaction
 ;;
-(ns prototyping.os-helpers
+(ns tester-core.os-helpers
   (:require [net.n01se.clojure-jna  :as jna])
   (:import  java.lang.ProcessBuilder))
 

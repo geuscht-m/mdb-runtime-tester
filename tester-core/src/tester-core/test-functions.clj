@@ -1,4 +1,4 @@
-(in-ns 'prototyping.core)
+(in-ns 'tester-core.core)
 
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"

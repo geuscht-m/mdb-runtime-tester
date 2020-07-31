@@ -1,7 +1,7 @@
-(ns prototyping.core-test-sharded
+(ns tester-core.core-test-sharded
   (:require [clojure.test :refer :all]
-            [prototyping.core :refer :all]
-            [prototyping.test-helpers :refer :all]
+            [tester-core.core :refer :all]
+            [tester-core.test-helpers :refer :all]
             [clojure.java.shell :refer [sh]]))
 
 (defn- control-sharded-cluster
