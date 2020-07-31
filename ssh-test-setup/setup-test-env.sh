@@ -1,1 +1,1 @@
-../prototyping/set-up-test-env.sh
+../tester-core/set-up-test-env.sh
