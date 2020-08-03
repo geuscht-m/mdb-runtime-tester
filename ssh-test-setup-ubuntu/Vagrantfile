@@ -73,11 +73,11 @@ Vagrant.configure("2") do |config|
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data-ssl/keyfile ; chmod 600 /home/vagrant/data-ssl/keyfile"
       node.vm.provision "shell", inline: "sudo apt-get install -y gnupg"
-      node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add -"
-      node.vm.provision "shell", inline: "echo \"deb http://repo.mongodb.org/apt/debian buster/mongodb-org/4.4 main\" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list"
-      node.vm.provision "shell", inline: "sudo apt update"
-      node.vm.provision "shell", inline: "sudo apt upgrade -y"
-      node.vm.provision "shell", inline: "sudo apt-get install -y mongodb-org"
+      node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.0.asc | sudo apt-key add -"
+      node.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.0 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
+      node.vm.provision "shell", inline: "sudo apt-get update"
+      node.vm.provision "shell", inline: "sudo apt-get upgrade -y"
+      node.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise"
       node.vm.provision "shell", inline: <<-SSHD_CONFIG
         sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
         systemctl restart sshd.service
@@ -104,11 +104,11 @@ Vagrant.configure("2") do |config|
     tester.vm.provision "file",  source: "config-timeouts.js", destination: "config-timeouts.js"
     tester.vm.provision "file",  source: "setup-test-env.sh",  destination: "setup-test-env.sh"
     tester.vm.provision "shell", inline: "sudo apt-get install gnupg"
-    tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add -"
-    tester.vm.provision "shell", inline: "echo \"deb http://repo.mongodb.org/apt/debian buster/mongodb-org/4.4 main\" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list"
+    tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.0.asc | sudo apt-key add -"
+    tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.0 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
     tester.vm.provision "shell", inline: "sudo apt-get update"
     tester.vm.provision "shell", inline: "sudo apt upgrade -y"
-    tester.vm.provision "shell", inline: "sudo apt-get install -y mongodb-org"
+    tester.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise"
     tester.vm.provision "shell", inline: "sudo apt-get install -y emacs-nox tmux leiningen python3-pip"
     tester.vm.provision "shell", inline: "sudo pip3 install mtools psutil pymongo"
     tester.vm.provision "hosts", :sync_hosts => true
