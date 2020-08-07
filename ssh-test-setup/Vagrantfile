@@ -1,8 +1,10 @@
 require 'fileutils'
 
+mongodb_version = "3.6"
+
 Vagrant.configure("2") do |config|
   # Generate the TLS certs if they don't exist yet
-  if not File.directory?('tls')
+  if not File.directory?('tls') and (ARGV[0] == 'up' || ARGV[0] == 'provision')
     Dir.mkdir 'tls'
     Dir.mkdir 'tls/CA'
     # Generate root certificate
@@ -25,6 +27,12 @@ Vagrant.configure("2") do |config|
     system('openssl x509 -req -days 365 -sha256 -in tls/testdriver/testdriver.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/testdriver/testdriver.crt')
     system('cat tls/testdriver/testdriver.crt tls/testdriver/testdriver.key > tls/testdriver/testdriver.pem')
     File.delete('ext_openssl_td.cnf')
+
+    Dir.mkdir 'tls/user-cert'
+    system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/user-cert/user-cert.key -out tls/user-cert/user-cert.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Users/CN=test-user\"")
+    #system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_user-test.cnf -out tls/user-test/user-test.crt")
+    system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/user-cert/user-cert.crt")
+    system("cat tls/user-cert/user-cert.crt tls/user-cert/user-cert.key > tls/user-cert/user-cert.pem")
   end
 
   # Regen the ssh keys used to communicate between testdriver and rs[1-3] if we're in up or provision mode
@@ -56,27 +64,28 @@ Vagrant.configure("2") do |config|
       node.vm.hostname = "rs#{i}.mongodb.test"
       node.vm.synced_folder ".", "/vagrant", disabled: true
       node.vm.provision "hosts", :sync_hosts => true
-      node.vm.provision "file",  source: "mongod-ssh-rs.conf", destination: "mongod-ssh-rs.conf"
-      node.vm.provision "file",  source: "mongod-ssh-ssl.conf", destination: "mongod-ssh-ssl.conf"
+      ['mongod-ssh-rs.conf', 'mongod-ssh-ssl.conf', 'mongod-ssh-x509.conf', 'mongod-ssh-x509-noauth.conf'].each do |filename|
+        node.vm.provision 'file',source: filename, destination: filename
+      end        
       node.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
       node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
       node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
-      node.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
-      node.vm.provision "file",  source: "init-replicaset-ssl.js", destination: "init-replicaset-ssl.js"
-      node.vm.provision "file",  source: "create-test-user.js", destination: "create-test-user.js"
-      node.vm.provision "file",  source: "start-mongod-replset-node.sh", destination: "start-mongod-replset-node.sh"
+      ['init-replicaset.js', 'init-replicaset-ssl.js', 'init-replicaset-x509.js', 'create-test-user.js', 'create-test-user-x509.js', 'start-mongod-replset-node.sh'].each do |file|
+        node.vm.provision 'file',source: file, destination: file
+      end
       node.vm.provision "shell", inline: 'chown vagrant:vagrant start-mongod-replset-node.sh ; chmod 700 start-mongod-replset-node.sh'
       node.vm.provision "shell", inline: "[ -d /home/vagrant/data ] || mkdir -p data", privileged: false
       node.vm.provision "shell", inline: "[ -d /home/vagrant/data-ssl ] || mkdir -p data-ssl", privileged: false
+      node.vm.provision 'shell', inline: '[ -d /home/vagrant/data-x509 ] || mkdir -p data-x509', privileged: false
       node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data/keyfile"
       node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-ssl/keyfile"
+      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-x509/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
       node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data-ssl/keyfile ; chmod 600 /home/vagrant/data-ssl/keyfile"
-      #node.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
-      node.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
-      node.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
-      #node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
-      node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
+      node.vm.provision 'shell', inline: 'chown vagrant:vagrant /home/vagrant/data-x509/keyfile ; chmod 600 /home/vagrant/data-x509/keyfile'
+      node.vm.provision "file",  source: "mongo-yum-#{mongodb_version}.repo", destination: "mongodb-org-#{mongodb_version}.repo"
+      node.vm.provision "shell", inline: '[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d'
+      node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-#{mongodb_version}.repo /etc/yum/repos.d/"
       node.vm.provision "shell", inline: 'sudo yum install -y mongodb-org'
       node.vm.provision "shell", inline: <<-SSHD_CONFIG
         sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -99,6 +108,7 @@ Vagrant.configure("2") do |config|
     tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
     tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
     tester.vm.provision "file",  source: "tls/CA/root.crt",    destination: "tls/root.crt"
+    tester.vm.provision "file",  source: 'tls/user-cert/user-cert.pem', destination: 'tls/user-cert.pem'
     #tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
     tester.vm.provision "file",  source: "config-timeouts.js", destination: "config-timeouts.js"
     tester.vm.provision "file",  source: "setup-test-env.sh",  destination: "setup-test-env.sh"
@@ -114,11 +124,9 @@ Vagrant.configure("2") do |config|
       chmod a+x /home/vagrant/bin/lein
     fi
     LEIN_INSTALL
-    tester.vm.provision "shell", inline: "[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d"
-    #tester.vm.provision "file",  source: 'mongo-yum-4.0.repo', destination: 'mongodb-org-4.0.repo'
-    tester.vm.provision "file",  source: 'mongo-yum-3.6.repo', destination: 'mongodb-org-3.6.repo'
-    #tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-4.0.repo /etc/yum/repos.d/"
-    tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-3.6.repo /etc/yum/repos.d/"
+    tester.vm.provision "shell", inline: '[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d'
+    tester.vm.provision 'file',  source: "mongo-yum-#{mongodb_version}.repo", destination: "mongodb-org-#{mongodb_version}.repo"
+    tester.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-#{mongodb_version}.repo /etc/yum/repos.d/"
     tester.vm.provision "shell", inline: 'sudo yum install -y mongodb-org'
     tester.vm.provision "shell", inline: "mkdir -p git-repo/mdb-runtime-tester"
     tester.vm.provision "hosts", :sync_hosts => true
@@ -128,7 +136,7 @@ Vagrant.configure("2") do |config|
     tester.vm.synced_folder ".", "/vagrant", disabled: true
     tester.vm.synced_folder "../../mdb-runtime-tester/", "/home/vagrant/git-repo/mdb-runtime-tester"
     tester.vm.provider "virtualbox" do |vb|
-      vb.customize ["modifyvm", :id, "--cpus", "3", "--memory", "3092"]
+      vb.customize ["modifyvm", :id, "--cpus", "3", "--memory", "3072"]
     end
     tester.vm.provision 'shell', inline: 'sudo systemctl stop mongod && sudo systemctl disable mongod'
     tester.vm.provision :reload
@@ -138,8 +146,12 @@ Vagrant.configure("2") do |config|
   config.vm.define "rs-3" do |rs_node|
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:27017 init-replicaset.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:28017 --ssl --sslCAFile tls/root.crt init-replicaset-ssl.js', privileged: false
-    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:27017/admin?replicaSet=replTest create-test-user.js', privileged: false
-    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:28017/admin?replicaSet=replTestTLS --ssl --sslCAFile tls/root.crt create-test-user.js', privileged: false
+    #rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:29017 --ssl --sslCAFile tls/root.crt init-replicaset-x509.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:29017 init-replicaset-x509.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:27017,rs3.mongodb.test:27017/admin?replicaSet=replTest create-test-user.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:28017,rs3.mongodb.test:28017/admin?replicaSet=replTestTLS --ssl --sslCAFile tls/root.crt create-test-user.js', privileged: false
+    #rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:29017,rs3.mongodb.test:29017/admin?replicaSet=replTestX509 --ssl --sslCAFile tls/root.crt create-test-user-x509.js', privileged: false
+    rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:29017,rs3.mongodb.test:29017/admin?replicaSet=replTestX509 create-test-user-x509.js', privileged: false
   end
 
 end
