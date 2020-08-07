@@ -165,15 +165,16 @@
       (catch MongoCommandException e
         ;;(println "Received exception " e)
         (if (= (.getErrorCode e) 211)
-          ((println "Received 'KeyNotFound' exception, retrying command " command " once more on database " db)
-           (Thread/sleep 150)
-           (let [result (mdb-exec-command db command readPreference)]
-             (println "Result of retried call is " result)
-             (let [converted (pcv/from-bson-document result true)]
-               (println "Converted result is " converted)
-               converted)))
-          ((println "Received MongoCommandException " e)
-           (throw e)))))))
+          (do ;;(println "Received 'KeyNotFound' exception, retrying command " command " once more on database " db)
+              (Thread/sleep 150)
+              (let [result (mdb-exec-command db command readPreference)]
+                ;;(println "Result of retried call is " result)
+                (pcv/from-bson-document result true)))
+             ;; (let [converted (pcv/from-bson-document result true)]
+             ;;   (println "Converted result is " converted)
+             ;;   converted)))
+          (do (println "Received MongoCommandException " e)
+              (throw e)))))))
 
 (defn mdb-admin-command
   "Run a MongoDB command against the admin database"

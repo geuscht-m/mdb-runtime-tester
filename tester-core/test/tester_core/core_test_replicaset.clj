@@ -10,14 +10,7 @@
   "Controls test replica set start/stop using mlaunch"
   [cmd]
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica"))))
-
-(defn- wait-mongod-shutdown
-  "Wait until we have no further MongoDB processes running"
-  []
-  (while (> (num-running-mongo-processes) 0)
-    ;;(println "Waiting for test processes to shut down")
-    (Thread/sleep 500)))
+    (do (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/replica")))))
 
 (defn- wrap-rs-tests
   "Intialisation wrapper for test runner, executed for every test.
@@ -30,7 +23,8 @@
     (f)
     (println "Test replica set not ready in time"))
   (control-test-rs "stop")
-  (wait-mongod-shutdown)) 
+  (wait-mongo-shutdown 20)
+  (is (= 0 (num-running-mongo-processes))))
 
 (use-fixtures :each wrap-rs-tests)
 

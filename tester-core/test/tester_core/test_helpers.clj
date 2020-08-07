@@ -2,7 +2,8 @@
   (:require [tester-core.core :refer :all]
             [tester-core.sys-helpers :refer :all]
             [tester-core.mini-driver :as md :refer :all]
-            [clj-ssh.ssh :as ssh :refer :all])
+            [clj-ssh.ssh :as ssh :refer :all]
+            [clojure.set :refer :all])
   (:import  [com.mongodb ReadPreference]))
 
 
@@ -13,11 +14,36 @@
 
 (defn num-running-mongo-processes
   "Figure out how many mongodb process (mongos or mongod) are currently running"
-  []
-  (let [processes (get-process-list)
-        running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
-    ;;(println "currently running mongo processes " running)
-    (count running)))
+  ([]
+   (let [processes (get-process-list)
+         running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
+     ;;(println "currently running mongo processes " running)
+     (count running)))
+  ([server-list]
+   (let [processes (apply clojure.set/union (get-process-list server-list))]
+     ;; (println "type of processes " (type processes))
+     ;; (println "num-running-mongo-processes - processes are " processes)
+     (let [running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
+       (println "Running mongo processes are " running)
+       (count running)))))
+
+(defn wait-mongo-shutdown
+  "Wait until we have no further MongoDB processes running"
+  ([max-retries]
+   (let [retries (atom 0)]
+     (while (and (> (num-running-mongo-processes) 0) (< @retries max-retries))
+       (Thread/sleep 500)
+       (reset! retries (inc @retries)))
+     (if (>= @retries max-retries)
+       (println "Unable to shut down remaining mongo processes, aborting"))))
+  ([server-list max-retries]
+   (let [retries (atom 0)]
+     (while (and (> (num-running-mongo-processes server-list) 0) (< @retries max-retries))
+       (do ;;(println "Waiting for remote mongo process to shut down, attempt " @retries)
+         (Thread/sleep 500)
+         (reset! retries (inc @retries))))
+     (if (>= @retries max-retries)
+       (println "Unable to shut down remaining mongod processes")))))
 
 (defn mongodb-port-list
   "Given a process list, retrieve the list of mongod/mongos port numbers of active
@@ -114,15 +140,15 @@
 ;;
 ;; SSH-based test helpers
 ;;
-(defn- run-remote-ssh-command
-  "Execute a command described by cmdline on the remote server 'server'"
-  [server cmdline]
-  ;;(println "\nAttempting to run ssh command " cmdline "\n")
-  (let [agent   (ssh/ssh-agent {})
-        session (ssh/session agent server {:strict-host-key-checking :no})]
-    (ssh/with-connection session
-      (let [result (ssh/ssh session { :cmd cmdline })]
-        result))))
+;; (defn- run-remote-ssh-command
+;;   "Execute a command described by cmdline on the remote server 'server'"
+;;   [server cmdline]
+;;   ;;(println "\nAttempting to run ssh command " cmdline "\n")
+;;   (let [agent   (ssh/ssh-agent {})
+;;         session (ssh/session agent server {:strict-host-key-checking :no})]
+;;     (ssh/with-connection session
+;;       (let [result (ssh/ssh session { :cmd cmdline })]
+;;         result))))
 
 (defn ssh-apply-command-to-rs-servers
   [cmd servers]

@@ -18,16 +18,30 @@
   [servers]
   (ssh-apply-command-to-rs-servers "pkill mongod" servers))
 
+;; (defn- wait-mongo-shutdown
+;;   "Wait until we have no further MongoDB processes running"
+;;   [server-list max-retries]
+;;   (let [retries (atom 0)]
+;;     (while (> (num-running-mongo-processes server-list) 0)
+;;       ;;(println "Waiting for test processes to shut down")
+;;       (if (< @retries max-retries)
+;;         (do ;;(println "Waiting for remote mongo process to shut down, attempt " @retries)
+;;             (Thread/sleep 500)
+;;             (reset! retries (inc @retries)))
+;;         (println "Unable to shut down remaining mongod processes")))))
+
+
 (defn- ssh-test-fixture
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
+    (is (= 0 (num-running-mongo-processes servers)))
     (start-remote-mongods servers)
     (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99")
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
-    (Thread/sleep 650)))
+    (wait-mongo-shutdown servers 20)))
 
 (use-fixtures :each ssh-test-fixture)
 

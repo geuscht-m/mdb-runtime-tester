@@ -9,7 +9,7 @@
    only supports start/stop commands"
   [cmd]
   (let [homedir (System/getenv "HOME")]
-    (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/sharded"))))
+    (do (sh "mlaunch" cmd "--dir" (str homedir "/tmp/mdb-test/sharded")))))
 
 (defn- wait-test-cluster-ready
   "Waits until the replica sets for the cluster are ready for testing so we don't
@@ -26,13 +26,6 @@
     ;;(println "Test cluster ready, took " @retries " retries")
     (< @retries 19)))
 
-(defn- wait-mongo-shutdown
-  "Wait until we have no further MongoDB processes running"
-  []
-  (while (> (num-running-mongo-processes) 0)
-    ;;(println "Waiting for test processes to shut down")
-    (Thread/sleep 500)))
-
 (defn wrap-sharded-tests
   "Intialisation wrapper for test runner, executed for every test.
    Tries to provide sane environment"
@@ -41,10 +34,10 @@
   (control-sharded-cluster "start")
   (Thread/sleep 500)
   (if (wait-test-cluster-ready)
-    (f)
+    (do (is (= 13 (num-running-mongo-processes))) (f))
     (println "Test sharded cluster readiness timed out"))
   (control-sharded-cluster "stop")
-  (wait-mongo-shutdown))
+  (wait-mongo-shutdown 40))
 
 (use-fixtures :each wrap-sharded-tests)
 

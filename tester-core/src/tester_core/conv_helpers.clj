@@ -7,6 +7,7 @@
             [java.util List Map Date Set]
             org.bson.Document
             org.bson.types.ObjectId
+            org.bson.types.Binary
             (org.bson.types Decimal128)))
 
 
@@ -96,6 +97,11 @@
   (from-bson-document [^com.mongodb.DBRef input keywordize]
     input)
 
+  ;; Binary
+  ;; (from-bson-document [^Binary input keywordize]
+  ;;   (println "Converting binary")
+  ;;   input)
+  
   Document
   (from-bson-document [^Document input keywordize]
     ;; DBObject provides .toMap, but the implementation in
@@ -103,6 +109,7 @@
     ;; UnsupportedOperationException.
     (reduce (if keywordize
               (fn [m ^String k]
+                ;;(println "Type of input k is " (type (.get input k)))
                 (assoc m (keyword k) (from-bson-document (.get input k) true)))
               (fn [m ^String k]
                 (assoc m k (from-bson-document (.get input k) false))))

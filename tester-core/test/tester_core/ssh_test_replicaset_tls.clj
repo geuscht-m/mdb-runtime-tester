@@ -21,13 +21,14 @@
 (defn- ssh-test-fixture
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
+    (is (= 0 (num-running-mongo-processes servers)))
     (start-remote-mongods servers)
     (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&ssl=true" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
-    (Thread/sleep 500)))
+    (wait-mongo-shutdown servers 20)))
 
 (use-fixtures :each ssh-test-fixture)
 
