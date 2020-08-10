@@ -5,19 +5,25 @@
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
         [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block MongoCommandException]
         [com.mongodb.connection SslSettings]
-        [javax.net.ssl SSLContext TrustManagerFactory]
+        [javax.net.ssl SSLContext TrustManagerFactory KeyManagerFactory]
         [java.security KeyStore]
         [java.security.cert CertificateFactory]
         [java.io FileInputStream])
+
+(defn- loadX509Cert
+  [cert-path]
+  (with-open [in-file (FileInputStream. cert-path)]
+    (let [cf       (CertificateFactory/getInstance "X.509")
+          cert     (.generateCertificate cf in-file)
+          subject  (.getName (.getSubjectDN cert))]
+      {:subject subject :cert cert})))
 
 (defn- ^SSLContext ssl-context-with-ca
   "Create an SSLContext for use by the driver using a supplied
    root CA file. Needed for untrusted and self-signed certificates"
   [root-ca-file]
   ;;(println "Building SSLContext from root certificate file " root-ca-file)
-  (let [is (FileInputStream. root-ca-file)
-        cf (CertificateFactory/getInstance "X.509")
-        ca-cert (.generateCertificate cf is)]
+  (let [ca-cert (get (loadX509Cert root-ca-file) :cert)]
     ;;(println "ca-cert is " ca-cert)
     (let [ks      (doto (KeyStore/getInstance (KeyStore/getDefaultType))
                     (.load nil)
@@ -28,6 +34,26 @@
         ;;(println "TrustManagerFactory tmf is" tmf)
         (doto (SSLContext/getInstance "TLS")
           (.init nil (.getTrustManagers tmf) nil))))))
+
+(defn- ^SSLContext ssl-context-with-client-cert
+  "Create an SSL Context with an optional root CA
+   and a client certificate for x.509"
+  [root-ca-file client-cert]
+  (let [x509-cert (loadX509Cert client-cert)
+        ca-cert   (loadX509Cert root-ca-file)
+        ks-root    (doto (KeyStore/getInstance (KeyStore/getDefaultType))
+                    (.load nil)
+                    (.setCertificateEntry "caCert" ca-cert))
+        ks-client (doto (KeyStore/getInstance (KeyStore/getDefaultType))
+                    (.load nil)
+                    (.setCertificateEntry (get x509-cert :subject) (get x509-cert :cert)))]
+    (let [tmf (doto (TrustManagerFactory/getInstance (TrustManagerFactory/getDefaultAlgorithm))
+                (.init ks-root))
+          kmf (doto (KeyManagerFactory/getInstance (KeyManagerFactory/getDefaultAlgorithm))
+                (.init ks-client))]
+      (let [context (doto (SSLContext/getInstance "TLS")
+                      (.init (.getKeyManagers kmf) (.getTrustManagers tmf) nil))]
+        { :subject (get x509-cert :subject) :ssl-context context}))))
 
 (defn- create-ssl-mongo-client-no-ssl-context
   [mongo-uri ssl]
@@ -95,6 +121,22 @@
   (if (nil? root-ca)
     (create-ssl-mongo-client-no-ssl-context mongo-uri ssl)
     (create-ssl-mongo-client-with-ssl-context mongo-uri ssl root-ca)))
+
+(defn- create-x509-client-with-ssl-and-client-cert
+  [mongo-uri ssl root-ca client-cert]
+  (let [client-context (ssl-context-with-client-cert root-ca client-cert)
+        cred           (MongoCredential/createMongoX509Credential (get client-context :subject))]
+    (MongoClients/create
+     (-> (MongoClientSettings/builder)
+         (.applyConnectionString (ConnectionString. mongo-uri))
+         (.applyToSslSettings(reify
+                               com.mongodb.Block
+                               (apply [this s] (-> s
+                                                   (.enabled true)
+                                                   (.context (get client-context :ssl-context))
+                                                   (.build)))))
+         (.credential cred)
+         (.build)))))
 
 (defn- create-scram-client-with-ssl
   [mongo-uri user pwd ssl root-ca]
