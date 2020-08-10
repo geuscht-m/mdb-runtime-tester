@@ -64,8 +64,8 @@
 
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
-  [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
-   (let [rs-status (get (run-replset-get-status rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :read-preference (ReadPreference/primaryPreferred)) :members)
+  [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
+   (let [rs-status (get (run-replset-get-status rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :read-preference (ReadPreference/primaryPreferred) :client-cert client-cert :auth-mechanism auth-mechanism) :members)
          degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
      ;;(println "\nReplica set status is " rs-status)
      ;;(println "degraded is " (some identity degraded) "\n")
@@ -73,8 +73,8 @@
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  [rs-uri num-nodes & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
-  (let [conn (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+  [rs-uri num-nodes & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
+  (let [conn (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
         num-active (num-active-rs-members conn)
         primary    (get-rs-primary conn)]
     (md/mdb-disconnect conn)
@@ -86,9 +86,9 @@
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
-  [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil} }]
+  [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
    (let [retries (atom 0)]
-     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca)) (< @retries max-retries))
+     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)) (< @retries max-retries))
        ;;(println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
@@ -98,10 +98,10 @@
 
 (defn replica-set-read-only?
   "Check if the replica set is read only by checking if it has no primary)"
-  [rs-uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } } ]
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } } ]
   (let [mongo-uri   (make-mongo-uri rs-uri)
         ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))
-        primary     (get-rs-primary mongo-uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)]
+        primary     (get-rs-primary mongo-uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
     (nil? primary)))
   
 

@@ -111,13 +111,13 @@
 (defn ^MongoClient mdb-connect
   "Connect to a MongoDB database cluster using a URI and an optional
    authentication method"
-  [mongo-uri & { :keys [ user pwd auth-method ssl root-ca client-cert ] :or { user nil pwd nil auth-method nil ssl false root-ca nil client-cert nil}}]
+  [mongo-uri & { :keys [ user pwd auth-mechanism ssl root-ca client-cert ] :or { user nil pwd nil auth-mechanism nil ssl false root-ca nil client-cert nil}}]
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
   ;;(println "Attempting to connect to " mongo-uri)
   ;;(println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
-  (if (or (nil? auth-method) (str/starts-with? auth-method "SCRAM-SHA"))
+  (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
     ;; encoded in the URI connection string
     (let [ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))]
@@ -126,19 +126,19 @@
                           (MongoClients/create (ConnectionString. mongo-uri)))
             (and (not (nil? user))
                  (not (nil? pwd))) (create-scram-client-with-ssl mongo-uri user pwd ssl-enabled root-ca)))
-    (cond (and (= auth-method "MONGODB-X509")
+    (cond (and (= auth-mechanism "MONGODB-X509")
                (nil? user))        (MongoClients/create
                                     (-> (MongoClientSettings/builder)
                                         (.applyConnectionString (ConnectionString. mongo-uri))
                                         (.credential (MongoCredential/createMongoX509Credential))
                                         (.build)))
-          (and (= auth-method "MONGODB-X509")
+          (and (= auth-mechanism "MONGODB-X509")
                (not (nil? user)))  (MongoClients/create
                                     (-> (MongoClientSettings/builder)
                                         (.applyConnectionString (ConnectionString. mongo-uri))
                                         (.credential (MongoCredential/createMongoX509Credential user))
                                         (.build)))
-          false (println "Unsupported authentication method " auth-method))))
+          false (println "Unsupported authentication method " auth-mechanism))))
 
 (defn mdb-disconnect
   "Close an existing connection to a MongoDB cluster"
