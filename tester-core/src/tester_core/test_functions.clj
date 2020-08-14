@@ -2,13 +2,13 @@
 
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
-  [rs-uri & { :keys [forced user pwd ssl root-ca] :or {forced false user nil pwd nil ssl false root-ca nil}}]
-  (stepdown-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))
+  [rs-uri & { :keys [forced user pwd ssl root-ca client-cert auth-mechanism] :or {forced false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
+  (stepdown-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism))
 
 (defn simulate-maintenance
   "Simulate maintenance/rolling mongod bounce on a replica set. Fails if the RS URI doesn't point to a valid RS"
-  [rs-uri & { :keys [ user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil} }]
-  (let [conn        (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
+  (let [conn        (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
         primary     (get (get-rs-primary conn) :name)
         secondaries (doall (map #(get % :name) (get-rs-secondaries conn)))]
     (md/mdb-disconnect conn)
@@ -27,10 +27,10 @@
 (defn- partial-stop-rs
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
-  [rs-uri member-num & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  [rs-uri member-num & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
   (let [ssl-enabled  (or ssl (.contains rs-uri "ssl=true"))
-        stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)))
-        restart-info (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca) stop-members))]
+        stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
+        restart-info (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) stop-members))]
     ;;(println "\nRestart info" restart-info)
     (fn [] (if (seq? restart-info)
              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
@@ -38,19 +38,19 @@
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
-  ([rs-uri & { :keys [ ^String user ^String pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil }}]
+  ([rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil }}]
    ;;(println "make-rs-degraded called with URI " rs-uri " and user " user ", password " pwd ", root-ca " root-ca)
-   (let [num-members (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
+   (let [num-members (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
          stop-rs-num (quot num-members 2)]
      ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
      ;;(println "\nStopping RS members from uri " rs-uri "\n")
-     (partial-stop-rs rs-uri stop-rs-num :user user :pwd pwd :ssl ssl :root-ca root-ca))))
+     (partial-stop-rs rs-uri stop-rs-num :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism))))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
-  ([rs-uri & { :keys [ user pwd ssl root-ca ] :or { user nil pwd nil ssl false root-ca nil } }]
+  ([rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
    ;;(println "\nMaking replica set read only " rs-uri "\n")
-   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) 2) 1) :user user :pwd pwd :ssl ssl :root-ca root-ca)))
+   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) 2) 1) :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
 
 (defn make-shard-degraded
   "Simulate a single degraded shard on a sharded cluster"

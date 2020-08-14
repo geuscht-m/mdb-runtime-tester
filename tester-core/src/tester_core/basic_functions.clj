@@ -31,23 +31,23 @@
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
    SIGTERM or SIGKILL to shut down the process rather than sending the process a shutdown command"
-  [uri & { :keys [ force user pwd ssl root-ca ] :or { force false user nil pwd nil ssl false root-ca nil } }]
-  (let [result (kill-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca)]
+  [uri & { :keys [ force user pwd ssl root-ca client-cert auth-mechanism ] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
+  (let [result (kill-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
     ;;(println "kill-mongo-process-impl returned " result)
     { :uri uri :cmd-line (get result :argv) }))
 
 (defn restart-mongo-process
   "Stops and starts a mongo process"
-  [uri & { :keys [user pwd ssl] :or { user nil pwd nil ssl false}}]
+  [uri & { :keys [user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
   ;;(println "Restarting mongo process on " uri " with username " user " and password " pwd)
-  (let [mongo-parameters (stop-mongo-process uri :user user :pwd pwd :ssl ssl)]
+  (let [mongo-parameters (stop-mongo-process uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
     ;;(println "Restarting mongo process at uri " uri " with parameters " mongo-parameters)
     (start-mongo-process (get mongo-parameters :uri) (get mongo-parameters :cmd-line))))
 
 (defn stepdown-primary
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
-  [uri & { :keys [user pwd ssl root-ca] :or { user nil pwd nil ssl false root-ca nil}}]
-  (let [primary (get (get-rs-primary uri :user user :pwd pwd :ssl ssl :root-ca root-ca) :name)
+  [uri & { :keys [user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
+  (let [primary (get (get-rs-primary uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :name)
         ssl-enabled (or ssl (.contains uri "ssl=true"))]
     (println "Trying to step down primary " primary " on replica set " uri ", root-ca " root-ca)
     (run-replset-stepdown (make-mongo-uri primary) :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)))
