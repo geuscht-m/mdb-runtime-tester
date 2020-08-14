@@ -1,47 +1,14 @@
-require 'fileutils'
+require          'fileutils'
+require_relative 'common_functions'
+
+num_test_servers = 3
 
 Vagrant.configure("2") do |config|
   # Generate the TLS certs if they don't exist yet
-  if not File.directory?('tls') and (ARGV[0] == 'up' || ARGV[0] == 'provision')
-    Dir.mkdir 'tls'
-    Dir.mkdir 'tls/CA'
-    # Generate root certificate
-    system('openssl req -x509 -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/CA/root.key -sha256 -days 365 -out tls/CA/root.crt -subj "/C=US/ST=NY/L=NYC/O=TEST/CN=auth.mongodb.test"')
-    # Generate certificates for the replica set members
-    (1..3).each do |i|
-      Dir.mkdir "tls/rs#{i}"
-      tmp_cnf = "[SAN]\nsubjectAltName = @altNames\n[altNames]\nDNS.1 = localhost\nDNS.2 = rs#{i}.mongodb.test\n"
-      tmp_cnf_name = "ext_openssl_rs#{i}.cnf"
-      File.write(tmp_cnf_name, tmp_cnf)
-      system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/rs#{i}/rs#{i}.key -out tls/rs#{i}/rs#{i}.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=rs#{i}.mongodb.test\"")
-      system("openssl x509 -req -days 365 -sha256 -in tls/rs#{i}/rs#{i}.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_rs#{i}.cnf -out tls/rs#{i}/rs#{i}.crt")
-      system("cat tls/rs#{i}/rs#{i}.crt tls/rs#{i}/rs#{i}.key > tls/rs#{i}/rs#{i}.pem")
-      File.delete(tmp_cnf_name)
-    end
-    Dir.mkdir 'tls/testdriver'
-    tmp_cnf = "[SAN]\nsubjectAltName = @altNames\n[altNames]\nDNS.1 = localhost\nDNS.2 = testdriver.mongodb.test\n"
-    File.write('ext_openssl_td.cnf', tmp_cnf)
-    system('openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/testdriver/testdriver.key -out tls/testdriver/testdriver.csr -days 365 -subj "/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=testdriver.mongodb.test"')
-    system('openssl x509 -req -days 365 -sha256 -in tls/testdriver/testdriver.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/testdriver/testdriver.crt')
-    system('cat tls/testdriver/testdriver.crt tls/testdriver/testdriver.key > tls/testdriver/testdriver.pem')
-    File.delete('ext_openssl_td.cnf')
-
-    Dir.mkdir 'tls/user-cert'
-    system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/user-cert/user-cert.key -out tls/user-cert/user-cert.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Users/CN=test-user\"")
-    #system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_user-test.cnf -out tls/user-test/user-test.crt")
-    system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/user-cert/user-cert.crt")
-    system("cat tls/user-cert/user-cert.crt tls/user-cert/user-cert.key > tls/user-cert/user-cert.pem")
-  end
+  CommonSetupFunctions.setupTLSCerts(ARGV[0], num_test_servers)
 
   # Regen the ssh keys used to communicate between testdriver and rs[1-3] if we're in up or provision mode
-  if ARGV[0] == 'up' || ARGV[0] == 'provision'
-    if File.directory?("ssh")
-      FileUtils.rm_rf('ssh')
-    end
-    Dir.mkdir('ssh')
-    system('ssh-keygen -t ed25519 -f ssh/id_ed25519 -N ""')
-    insecure_ssh_pub_key = File.readlines('ssh/id_ed25519.pub').first.strip
-  end
+  insecure_ssh_pub_key = CommonSetupFunctions.setupSSHKeys(ARGV[0])
   
   if Vagrant.has_plugin?("vagrant-cachier")
     config.cache.scope = :box
@@ -62,12 +29,14 @@ Vagrant.configure("2") do |config|
       node.vm.hostname = "rs#{i}.mongodb.test"
       node.vm.synced_folder ".", "/vagrant", disabled: true
       node.vm.provision "hosts", :sync_hosts => true
-            ['mongod-ssh-rs.conf', 'mongod-ssh-ssl.conf', 'mongod-ssh-x509.conf', 'mongod-ssh-x509-noauth.conf'].each do |filename|
+      ['mongod-ssh-rs.conf', 'mongod-ssh-ssl.conf', 'mongod-ssh-x509.conf', 'mongod-ssh-x509-noauth.conf'].each do |filename|
         node.vm.provision 'file',source: filename, destination: filename
-      end        
-      node.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
-      node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
-      node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
+      end
+      if ARGV[0] == "up" || ARGV[0] == 'provision'
+        node.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
+        node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
+        node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
+      end
       ['init-replicaset.js', 'init-replicaset-ssl.js', 'init-replicaset-x509.js', 'create-test-user.js', 'create-test-user-x509.js', 'start-mongod-replset-node.sh'].each do |file|
         node.vm.provision 'file',source: file, destination: file
       end
@@ -104,10 +73,15 @@ Vagrant.configure("2") do |config|
   config.vm.define :testdriver do |tester|
     tester.vm.network :private_network, ip: "192.168.31.98"
     tester.vm.hostname = "testdriver.mongodb.test"
-    tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
-    tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
-    tester.vm.provision 'file',  source: 'tls/user-cert/user-cert.pem', destination: 'tls/user-cert.pem'
-    tester.vm.provision "file",  source: "tls/CA/root.crt",    destination: "tls/root.crt"
+    if ARGV[0] == "up" || ARGV[0] == 'provision'
+      tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
+      tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
+      tester.vm.provision "file",  source: "tls/CA/root.crt",    destination: "tls/root.crt"
+      tester.vm.provision 'file',  source: 'tls/user-cert/user-cert.pem', destination: 'tls/user-cert.pem'
+      tester.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh ] || mkdir /home/vagrant/.ssh", privileged: false
+      tester.vm.provision "file",  source: 'ssh/id_ed25519', destination: '.ssh/id_ed25519'
+      tester.vm.provision "file",  source: 'ssh/id_ed25519.pub', destination: '.ssh/id_ed25519.pub'
+    end
     #tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
     tester.vm.provision "file",  source: "config-timeouts.js", destination: "config-timeouts.js"
     tester.vm.provision "file",  source: "setup-test-env.sh",  destination: "setup-test-env.sh"
@@ -120,9 +94,6 @@ Vagrant.configure("2") do |config|
     tester.vm.provision "shell", inline: "sudo apt-get install -y emacs-nox tmux leiningen python3-pip"
     tester.vm.provision "shell", inline: "sudo pip3 install mtools psutil pymongo"
     tester.vm.provision "hosts", :sync_hosts => true
-    tester.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh ] || mkdir /home/vagrant/.ssh", privileged: false
-    tester.vm.provision "file",  source: 'ssh/id_ed25519', destination: '.ssh/id_ed25519'
-    tester.vm.provision "file",  source: 'ssh/id_ed25519.pub', destination: '.ssh/id_ed25519.pub'
     tester.vm.synced_folder ".", "/vagrant", disabled: true
     tester.vm.synced_folder "../../mdb-runtime-tester/", "/home/vagrant/git-repo/mdb-runtime-tester"
     tester.vm.provider "virtualbox" do |vb|
