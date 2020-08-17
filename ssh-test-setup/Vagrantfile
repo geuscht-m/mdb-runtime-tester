@@ -37,20 +37,18 @@ Vagrant.configure("2") do |config|
         node.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
         node.vm.provision "file",  source: "tls/rs#{i}/rs#{i}.pem", destination: "tls/mongo.pem"
         node.vm.provision "file",  source: "tls/CA/root.crt", destination: "tls/root.crt"
+        ['data','data-ssl','data-x509'].each do |dir|
+          node.vm.provision "shell", inline: "[ -d /home/vagrant/#{dir} ] || mkdir -p #{dir}", privileged: false
+        end
+        ['init-replicaset.js', 'init-replicaset-ssl.js', 'init-replicaset-x509.js', 'create-test-user.js', 'create-test-user-x509.js', 'start-mongod-replset-node.sh'].each do |file|
+          node.vm.provision 'file',source: file, destination: file
+        end
+        node.vm.provision "shell", inline: 'chown vagrant:vagrant start-mongod-replset-node.sh ; chmod 700 start-mongod-replset-node.sh'
+        ['/home/vagrant/data/keyfile', '/home/vagrant/data-ssl/keyfile', '/home/vagrant/data-x509/keyfile'].each do |destname|
+          node.vm.provision 'file',  source: 'test-keyfile', destination: destname
+          node.vm.provision "shell", inline: "chown vagrant:vagrant #{destname} ; chmod 600 #{destname}"
+        end
       end
-      ['init-replicaset.js', 'init-replicaset-ssl.js', 'init-replicaset-x509.js', 'create-test-user.js', 'create-test-user-x509.js', 'start-mongod-replset-node.sh'].each do |file|
-        node.vm.provision 'file',source: file, destination: file
-      end
-      node.vm.provision "shell", inline: 'chown vagrant:vagrant start-mongod-replset-node.sh ; chmod 700 start-mongod-replset-node.sh'
-      node.vm.provision "shell", inline: "[ -d /home/vagrant/data ] || mkdir -p data", privileged: false
-      node.vm.provision "shell", inline: "[ -d /home/vagrant/data-ssl ] || mkdir -p data-ssl", privileged: false
-      node.vm.provision 'shell', inline: '[ -d /home/vagrant/data-x509 ] || mkdir -p data-x509', privileged: false
-      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data/keyfile"
-      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-ssl/keyfile"
-      node.vm.provision "file",  source: "test-keyfile", destination: "/home/vagrant/data-x509/keyfile"
-      node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data/keyfile ; chmod 600 /home/vagrant/data/keyfile"
-      node.vm.provision "shell", inline: "chown vagrant:vagrant /home/vagrant/data-ssl/keyfile ; chmod 600 /home/vagrant/data-ssl/keyfile"
-      node.vm.provision 'shell', inline: 'chown vagrant:vagrant /home/vagrant/data-x509/keyfile ; chmod 600 /home/vagrant/data-x509/keyfile'
       node.vm.provision "file",  source: "mongo-yum-#{mongodb_version}.repo", destination: "mongodb-org-#{mongodb_version}.repo"
       node.vm.provision "shell", inline: '[ -d /etc/yum/repos.d ] || sudo mkdir -p /etc/yum/repos.d'
       node.vm.provision "shell", inline: "sudo mv /home/vagrant/mongodb-org-#{mongodb_version}.repo /etc/yum/repos.d/"
