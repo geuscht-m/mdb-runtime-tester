@@ -42,10 +42,13 @@ module CommonSetupFunctions
   end
 
   def self.createUserAuthCert
+    client_cert_cnf = "basicConstraints = CA:FALSE\nnsCertType = client, email\nkeyUsage = critical,nonRepudiation, digitalSignature, keyEncipherment\nextendedKeyUsage = clientAuth\n"
+    File.write('client_auth.cnf', client_cert_cnf)
     system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/user-cert/user-cert.key -out tls/user-cert/user-cert.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Users/CN=test-user\"")
     #system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_user-test.cnf -out tls/user-test/user-test.crt")
-    system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/user-cert/user-cert.crt")
+    system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extfile client_auth.cnf -out tls/user-cert/user-cert.crt")
     system("cat tls/user-cert/user-cert.crt tls/user-cert/user-cert.key > tls/user-cert/user-cert.pem")
+    #File.delete('client_auth.cnf')
   end
 
   def self.cleanUpCerts
