@@ -24,7 +24,7 @@
      ;; (println "type of processes " (type processes))
      ;; (println "num-running-mongo-processes - processes are " processes)
      (let [running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
-       (println "Running mongo processes are " running)
+       ;;(println "Running mongo processes are " running)
        (count running)))))
 
 (defn wait-mongo-shutdown
@@ -78,7 +78,7 @@
         num-active (num-active-rs-members conn)
         primary    (get-rs-primary conn)]
     (md/mdb-disconnect conn)
-    (and (= num-active num-active)
+    (and (= num-active num-nodes)
          (some? primary))))
   ;; (and (= (num-active-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) num-nodes)
   ;;      (some? (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))))
