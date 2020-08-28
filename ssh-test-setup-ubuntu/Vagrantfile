@@ -51,7 +51,7 @@ Vagrant.configure("2") do |config|
       node.vm.provision "shell", inline: "sudo apt-get install -y gnupg"
       node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -"
       node.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
-      node.vm.provision "shell", inline: "sudo apt-get update"
+      node.vm.provision "shell", inline: "sudo apt update"
       node.vm.provision "shell", inline: "sudo apt upgrade -y"
       node.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise"
       node.vm.provision "shell", inline: <<-SSHD_CONFIG
@@ -89,14 +89,14 @@ Vagrant.configure("2") do |config|
     tester.vm.provision "shell", inline: "sudo apt-get install gnupg"
     tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -"
     tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
-    tester.vm.provision "shell", inline: "sudo apt-get update"
+    tester.vm.provision "shell", inline: "sudo apt update"
     tester.vm.provision "shell", inline: "sudo apt upgrade -y"
-    tester.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise"
-    tester.vm.provision "shell", inline: "sudo apt-get install -y emacs-nox tmux leiningen python3-pip"
+    tester.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise emacs-nox tmux leiningen python3-pip"
     tester.vm.provision "shell", inline: "sudo pip3 install mtools psutil pymongo"
     tester.vm.provision "hosts", :sync_hosts => true
     tester.vm.synced_folder ".", "/vagrant", disabled: true
     tester.vm.synced_folder "../../mdb-runtime-tester/", "/home/vagrant/git-repo/mdb-runtime-tester"
+    tester.vm.synced_folder '../../clj-pem-decoder/', '/home/vagrant/git-repo/clj-pem-decoder'
     tester.vm.provider "virtualbox" do |vb|
       vb.customize ["modifyvm", :id, "--cpus", "4", "--memory", "3072"]
     end

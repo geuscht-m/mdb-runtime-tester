@@ -37,7 +37,7 @@ module CommonSetupFunctions
     File.write('ext_openssl_td.cnf', tmp_cnf)
     system('openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/testdriver/testdriver.key -out tls/testdriver/testdriver.csr -days 365 -subj "/C=US/ST=NY/L=NYC/O=TEST/OU=Server/CN=testdriver.mongodb.test"')
     system('openssl x509 -req -days 365 -sha256 -in tls/testdriver/testdriver.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -out tls/testdriver/testdriver.crt')
-    system('cat tls/testdriver/testdriver.crt tls/testdriver/testdriver.key > tls/testdriver/testdriver.pem')
+    system('cat tls/testdriver/testdriver.key tls/testdriver/testdriver.crt > tls/testdriver/testdriver.pem')
     File.delete('ext_openssl_td.cnf')
   end
 
@@ -47,7 +47,7 @@ module CommonSetupFunctions
     system("openssl req -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/user-cert/user-cert.key -out tls/user-cert/user-cert.csr -days 365 -subj \"/C=US/ST=NY/L=NYC/O=TEST/OU=Users/CN=test-user\"")
     #system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extensions SAN -extfile ext_openssl_user-test.cnf -out tls/user-test/user-test.crt")
     system("openssl x509 -req -days 365 -sha256 -in tls/user-cert/user-cert.csr -CA tls/CA/root.crt -CAkey tls/CA/root.key -CAcreateserial -extfile client_auth.cnf -out tls/user-cert/user-cert.crt")
-    system("cat tls/user-cert/user-cert.crt tls/user-cert/user-cert.key > tls/user-cert/user-cert.pem")
+    system("cat tls/user-cert/user-cert.key tls/user-cert/user-cert.crt > tls/user-cert/user-cert.pem")
     #File.delete('client_auth.cnf')
   end
 
