@@ -24,9 +24,9 @@
 
 (defn stop-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. Fails if process isn't running or cannot be stopped"
-  [uri & { :keys [force ^String user ^String pwd ssl root-ca] :or { force false user nil pwd nil ssl false root-ca nil } }]
+  [uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
   ;;(println "Stopping process at " uri " with user " user " and password " pwd ", root-ca " root-ca)
-  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca) :argv) })
+  { :uri uri :cmd-line (get (stop-mongo-process-impl uri :force force :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :argv) })
 
 (defn kill-mongo-process
   "Stop a local or remote mongo process (mongos or mongod) as listed by the URI. This function uses
@@ -50,7 +50,7 @@
   (let [primary (get (get-rs-primary uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :name)
         ssl-enabled (or ssl (.contains uri "ssl=true"))]
     (println "Trying to step down primary " primary " on replica set " uri ", root-ca " root-ca)
-    (run-replset-stepdown (make-mongo-uri primary) :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca)))
+    (run-replset-stepdown (make-mongo-uri primary) :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
 
 (defn start-rs-nodes
   "Takes a list of URIs for mongod/mongos that need to be started"

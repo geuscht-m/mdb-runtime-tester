@@ -50,7 +50,7 @@
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
   ([rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
    ;;(println "\nMaking replica set read only " rs-uri "\n")
-   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) 2) 1) :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
+   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) 2) 1) :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
 
 (defn make-shard-degraded
   "Simulate a single degraded shard on a sharded cluster"
