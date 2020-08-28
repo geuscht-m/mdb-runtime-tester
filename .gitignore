@@ -5,3 +5,4 @@ ssh-test-setup/ssh
 ssh-test-setup-ubuntu/ssh
 ssh-test-setup-ubuntu/tls
 *~
+tester_core/checkouts
