@@ -1,0 +1,1 @@
+../ssh-test-setup/init-replicaset-x509.js

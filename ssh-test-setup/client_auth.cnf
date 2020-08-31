@@ -1,0 +1,4 @@
+basicConstraints = CA:FALSE
+nsCertType = client, email
+keyUsage = critical,nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
