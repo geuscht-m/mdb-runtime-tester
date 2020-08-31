@@ -24,7 +24,7 @@
     (is (= 0 (num-running-mongo-processes servers)))
     (start-remote-mongods servers)
     (Thread/sleep 1500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&ssl=true" 3 17 :client-cert "../../../tls/user-cert.pem" :ssl true :root-ca "../../../tls/root.crt" :auth-mechanism "MONGODB-X509")
+    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&ssl=true" 3 17 :client-cert "../../../tls/user-cert.pem" :ssl true :root-ca "../../../tls/root.crt" :auth-mechanism :mongodb-x509)
       (f)
       (println "Test replica set not ready in time"))
     (stop-remote-mongods servers)
@@ -34,11 +34,11 @@
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
-    (is (not (is-mongos-process? "mongodb://rs1.mongodb.test:29017/?ssl=true" :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509")))))
+    (is (not (is-mongos-process? "mongodb://rs1.mongodb.test:29017/?ssl=true" :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509)))))
 
 (deftest test-is-mongod-process
   (testing "Check if we're running against a mongod process"
-    (is (is-mongod-process? "mongodb://rs2.mongodb.test:29017/?ssl=true" :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))))
+    (is (is-mongod-process? "mongodb://rs2.mongodb.test:29017/?ssl=true" :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))))
 
 
 ;; TODO - check why this call doesn't work against 3.6 w/ auth but does work in 4.0 w/o auth
@@ -49,7 +49,7 @@
 (deftest test-get-rs-topology
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [rs-uri       "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&ssl=true"
-          conn         (md/mdb-connect rs-uri :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509")
+          conn         (md/mdb-connect rs-uri :root-ca "../../../tls/root.crt" :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509)
           primary      (get (get-rs-primary conn) :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries conn)))]
       (md/mdb-disconnect conn)
@@ -64,50 +64,50 @@
     (let [rs-uri  "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&ssl=true"
           root-ca "../../../tls/root.crt"
           ;;restart-cmd (make-rs-degraded rs-uri) ]
-          restart-info (kill-mongo-process "mongodb://rs2.mongodb.test:29017/?ssl=true" :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509")]
+          restart-info (kill-mongo-process "mongodb://rs2.mongodb.test:29017/?ssl=true" :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509)]
       (is (not (nil? restart-info)))
       ;;(println "Restart info is " restart-info)
       (Thread/sleep 30000)
-      (is (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))
+      (is (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))
       (Thread/sleep 1000)
       (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))
       (Thread/sleep 5000)
-      (is (not (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))))))
+      (is (not (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))))))
 
 (deftest test-remote-stepdown
   (testing "Check that stepping down the primary on an RS works"
     (let [rs-uri  "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&ssl=true"
           root-ca          "../../../tls/root.crt"
-          original-primary (get (get-rs-primary rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509") :name)]
-      (trigger-election rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509")
+          original-primary (get (get-rs-primary rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509) :name)]
+      (trigger-election rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509)
       (Thread/sleep 11000)
-      (is (not (= (get (get-rs-primary rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509") :name) original-primary))))))
+      (is (not (= (get (get-rs-primary rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509) :name) original-primary))))))
 
 (deftest test-remote-degrade-rs
   (testing "Check that we can make a remote RS degraded (requires auth on remote RS"
     (let [rs-uri "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&ssl=true"
           root-ca          "../../../tls/root.crt"
-          restart-cmd (make-rs-degraded rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509") ]
+          restart-cmd (make-rs-degraded rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509) ]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 30000)
-      (is (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))
+      (is (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 8000)
-      (is (not (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))))))
+      (is (not (replicaset-degraded? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))))))
     
 (deftest test-remote-read-only-rs
   (testing "Check that we are able to successfully make a replica set read only
             and restore it afterwards"
     (let [rs-uri  "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&ssl=true"
           root-ca "../../../tls/root.crt"
-          restart-cmd (make-rs-read-only rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509")]
+          restart-cmd (make-rs-read-only rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509)]
       (is (not (nil? restart-cmd)))
       (Thread/sleep 20000)
-      (is (= (num-active-rs-members rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509") 1))
-      (is (replica-set-read-only? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509"))
+      (is (= (num-active-rs-members rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509) 1))
+      (is (replica-set-read-only? rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509))
       (Thread/sleep 1000)
       (restart-cmd)
       (Thread/sleep 5000)
-      (is (= (num-active-rs-members rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism "MONGODB-X509") 3))
+      (is (= (num-active-rs-members rs-uri :root-ca root-ca :client-cert "../../../tls/user-cert.pem" :auth-mechanism :mongodb-x509) 3))
       )))

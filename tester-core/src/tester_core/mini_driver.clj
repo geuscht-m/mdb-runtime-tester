@@ -179,9 +179,9 @@
                           (MongoClients/create (ConnectionString. mongo-uri)))
             (and (not (nil? user))
                  (not (nil? pwd))) (create-scram-client-with-ssl mongo-uri user pwd ssl-enabled root-ca)))
-    (cond (and (= auth-mechanism "MONGODB-X509") (nil? user))
+    (cond (and (= auth-mechanism :mongodb-x509) (nil? user))
           (create-x509-client-with-ssl-and-client-cert mongo-uri root-ca client-cert)
-          (and (= auth-mechanism "MONGODB-X509")
+          (and (= auth-mechanism :mongodb-x509)
                (not (nil? user)))  (MongoClients/create
                                     (-> (MongoClientSettings/builder)
                                         (.applyConnectionString (ConnectionString. mongo-uri))
