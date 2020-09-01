@@ -1,0 +1,19 @@
+# Basic test cases in YAML
+---
+Config:
+  - wait-between-tests: 120s
+---
+Test:
+  - operation: make-degraded
+    replicaset: rs1.mongodb.test, rs2.mongodb.test rs3.mongodb.test
+    wait-until-rollback: 60s
+---
+Test:
+  - operation: trigger-election
+    replicaset: mongodb://localhost:27017,localhost:27018,localhost:27019/
+---
+Test:
+  - operation: make-degraded
+    sharded-cluster: localhost:27107
+    wait-until-rollback: 500s
+---
