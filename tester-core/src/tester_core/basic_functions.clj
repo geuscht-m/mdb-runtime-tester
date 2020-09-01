@@ -49,7 +49,7 @@
   [uri & { :keys [user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
   (let [primary (get (get-rs-primary uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :name)
         ssl-enabled (or ssl (.contains uri "ssl=true"))]
-    (println "Trying to step down primary " primary " on replica set " uri ", root-ca " root-ca)
+    ;;(println "Trying to step down primary " primary " on replica set " uri ", root-ca " root-ca)
     (run-replset-stepdown (make-mongo-uri primary) :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
 
 (defn start-rs-nodes
