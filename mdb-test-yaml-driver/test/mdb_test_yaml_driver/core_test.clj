@@ -11,4 +11,5 @@
       ;;(println "Parsed file is " parsed-file)
       ;;(println "Type is " (type parsed-file))
       (is (not (nil? parsed-file)))
-      (is (= 4 (count parsed-file))))))
+      (is (= 4 (count parsed-file)))
+      (is (contains? (first parsed-file) :Config)))))
