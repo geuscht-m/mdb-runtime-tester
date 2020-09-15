@@ -7,7 +7,7 @@
                  [mdb-runtime-tester-core "0.1.0-SNAPSHOT"]
                  [clj-commons/clj-yaml    "0.7.0"]]
   :main ^:skip-aot mdb-test-yaml-driver.core
-  :local-repo "../local-m2"
+  ;;:local-repo "../local-m2"
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
                        :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})

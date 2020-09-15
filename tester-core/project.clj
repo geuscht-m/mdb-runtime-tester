@@ -17,7 +17,7 @@
                  [net.n01se/clojure-jna         "1.0.0" ] ;; JNA interface to native libraries
                  [clj-pem-decoder               "0.1.0-SNAPSHOT"]]
   ;;:git-dependencies [["https://github.com/geuscht-m/clj-pem-decoder.git"]]
-  :local-repo "../local-m2"
+  ;;:local-repo "../local-m2"
   :eftest { :multithread? false :test-warn-time 20000 }
   ;;:main tester-core.core
   :target-path "target/%s"
