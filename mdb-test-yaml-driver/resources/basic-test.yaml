@@ -5,7 +5,9 @@ Config:
 ---
 Test:
   - operation: make-degraded
-    replicaset: rs1.mongodb.test, rs2.mongodb.test rs3.mongodb.test
+    replicaset: mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest
+    user: admin
+    password: pw99
     wait-until-rollback: 60
 ---
 Test:

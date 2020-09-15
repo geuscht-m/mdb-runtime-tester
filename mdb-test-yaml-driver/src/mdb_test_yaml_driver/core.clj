@@ -13,14 +13,19 @@
   [test-element]
   (println "Test element is " test-element)
   (if (= (get test-element :operation) "make-degraded")
-    (cond (contains? test-element :sharded-cluster) ()
-          (contains? test-element :replicaset) ())
+    (cond (contains? test-element :sharded-cluster) (println "Degrading sharded cluster at " (get test-element :sharded-cluster))
+          (contains? test-element :replicaset) (if (contains? test-element :user)
+                                                 (let [restart-cmd     (tester-core.core/make-rs-degraded (get test-element :replicaset) :user (get test-element :user) :pwd (get test-element :password))
+                                                       revert-interval (if (nil? (get test-element :wait-until-rollback)) 30 (get test-element :wait-until-rollback))]
+                                                   (Thread/sleep (* revert-interval 1000))
+                                                   (restart-cmd))
+                                                 (tester-core.core/make-rs-degraded (get test-element :replicaset))))
     (let [test-name (get test-element :operation)]
       (println "Trying to resolve symbol " test-name)
       (let [testf (resolve (symbol "tester-core.core" (get test-element :operation)))]
         (if (nil? testf)
           (println "Error - unrecognised test function " (get test-element :operation))
-          (testf))))))
+          (testf (or (get test-element :replicaset) (get test-element :sharded-cluster))))))))
 
 (defn- exec-test
   [test]
