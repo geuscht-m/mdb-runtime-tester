@@ -15,6 +15,14 @@
                     :client-cert (get config-map :client-cert)
                     :auth-method (get config-map :auth-method) })))
 
+(defn parse-runner-settings
+  "Parses the test runner settings and returns a (potentially empty) map with
+   the settings"
+  [config-map]
+  (into {} (filter (comp some? val)
+                   { :wait-until-rollback (get config-map :wait-until-rollback)
+                    :wait-between-tests   (get config-map :wait-between-tests) })))
+
 (defn parse-config
   "Parse out the default Config section and populate the main configuration
    information from it"
@@ -27,40 +35,47 @@
     { :runner-config nil :test-config nil }))
 
 (defn exec-test-member
-  [test-element]
+  "Execute single test (test-element) with a configuration derived from both
+   main-test-config and test specific configuration derived from the test
+   configuration itself"
+  [test-element main-test-config main-runner-config]
   (println "Test element is " test-element)
-  (if (= (get test-element :operation) "make-degraded")
-    (cond (contains? test-element :sharded-cluster) (println "Degrading sharded cluster at " (get test-element :sharded-cluster))
-          (contains? test-element :replicaset) (if (contains? test-element :user)
-                                                 (let [restart-cmd     (tester-core.core/make-rs-degraded (get test-element :replicaset) :user (get test-element :user) :pwd (get test-element :password))
-                                                       revert-interval (if (nil? (get test-element :wait-until-rollback)) 30 (get test-element :wait-until-rollback))]
-                                                   (Thread/sleep (* revert-interval 1000))
-                                                   (restart-cmd))
-                                                 (tester-core.core/make-rs-degraded (get test-element :replicaset))))
-    (let [test-name (get test-element :operation)]
-      (println "Trying to resolve symbol " test-name)
-      (let [testf (resolve (symbol "tester-core.core" (get test-element :operation)))]
-        (if (nil? testf)
-          (println "Error - unrecognised test function " (get test-element :operation))
-          (testf (or (get test-element :replicaset) (get test-element :sharded-cluster))))))))
+  (let [merged-test-configs   (merge main-test-config (parse-test-settings test-element))
+        merged-runner-configs (merge main-runner-config (parse-runner-settings test-element))]
+    (if (= (get test-element :operation) "make-degraded")
+      (cond (contains? test-element :sharded-cluster) (println "Degrading sharded cluster at " (get test-element :sharded-cluster))
+            (contains? test-element :replicaset)      (let [restart-cmd     (tester-core.core/make-rs-degraded (get test-element :replicaset) merged-test-configs)
+                                                            revert-interval (if (nil? (get merged-runner-configs :wait-until-rollback)) 30 (get merged-runner-configs :wait-until-rollback))]
+                                                        (Thread/sleep (* revert-interval 1000))
+                                                        (restart-cmd)))
+      (let [test-name (get test-element :operation)]
+        (println "Trying to resolve symbol " test-name)
+        (let [testf (resolve (symbol "tester-core.core" (get test-element :operation)))]
+          (if (nil? testf)
+            (println "Error - unrecognised test function " (get test-element :operation))
+            (testf (or (get test-element :replicaset) (get test-element :sharded-cluster)) merged-test-configs)))))))
 
 (defn exec-test
-  [test]
+  [test main-test-config]
   (if-let [test-case (get test :Test)]
-    (doall (map exec-test-member test-case))
+    (doall (map exec-test-member test-case main-test-config))
     "Malformed test entry, no Test section found"))
 
 (defn run-tests
-  [tests & { :keys [config] :or {config nil}}]
-  (let [test-interval (if (or (nil? config) (nil? (get config :wait-between-tests))) 60 (get config :wait-between-tests))]
+  [tests & { :keys [testrunner-config test-config] :or {testrunner-config nil test-config nil}}]
+  (let [test-interval (if (or (nil? testrunner-config)
+                              (nil? (get testrunner-config :wait-between-tests)))
+                        60
+                        (get testrunner-config :wait-between-tests))]
     (println (type test-interval) " " test-interval)
-    (println config)
+    (println testrunner-config)
+    (println test-config)
     ;;(println (get config :wait-between-tests))
     ;;(println (type config))
     ;;(println (type tests))
     (println "\n" tests "\n\n")
     (doall (map (fn [t]
-                  (exec-test t)
+                  (exec-test t test-config)
                   (println "Sleeping for " test-interval " seconds")
                   (Thread/sleep (* test-interval 1000))) tests))))
 
@@ -68,8 +83,9 @@
   [tests]
   (if (nil? (get (first tests) :Config))
     (run-tests tests)
-    (run-tests (rest tests) :config (first (parse-config (first tests)))))
-  (println tests))
+    (let [main-config (parse-config (first tests))]
+      (run-tests (rest tests) :config (first (parse-config (first tests))))
+      (println tests))))
 
 (defn parse
   [args]
