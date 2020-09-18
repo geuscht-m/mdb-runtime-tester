@@ -3,10 +3,28 @@
             [clojure.string :as str])
   (:use     [tester-core.core]))
 
+(defn parse-test-settings
+  "Parses out test settings from the interpreted YAML section and returns
+   the non-nil fields for later merging"
+  [config-map]
+  (into {} (filter (comp some? val)
+                   { :user (get config-map :user)
+                    :pwd (get config-map :password)
+                    :root-ca (get config-map :root-ca)
+                    :ssl (get config-map :ssl)
+                    :client-cert (get config-map :client-cert)
+                    :auth-method (get config-map :auth-method) })))
+
 (defn parse-config
+  "Parse out the default Config section and populate the main configuration
+   information from it"
   [config-map]
   ;;(println config-map)
-  (get config-map :Config))
+  (if-let [main-config   (get config-map :Config)]
+    (let [runner-config { :wait-between-tests (get main-config :wait-between-tests) }
+          test-config   { :user (get main-config :user) :pwd (get main-config :password) :root-ca (get main-config :root-ca) :ssl (get main-config :ssl) :client-cert (get main-config :client-cert) :auth-method (get main-config :auth-method) }]
+      { :runner-config runner-config :test-config test-config })
+    { :runner-config nil :test-config nil }))
 
 (defn exec-test-member
   [test-element]
