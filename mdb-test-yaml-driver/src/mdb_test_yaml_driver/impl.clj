@@ -7,14 +7,14 @@
   "Parses out test settings from the interpreted YAML section and returns
    the non-nil fields for later merging"
   [config-map]
-  ;;(println "Parsing test settings" config-map ", type of parameter is " (type config-map))
+  ;; (println "Parsing test settings" config-map ", type of parameter is " (type config-map))
   (let [all-configs { :user (get config-map :user)
                     :pwd (get config-map :password)
                     :root-ca (get config-map :root-ca)
                     :ssl (get config-map :ssl)
                     :client-cert (get config-map :client-cert)
-                     :auth-method (get config-map :auth-method) }]
-    ;; (println "all-configs is " all-configs)
+                     :auth-mechanism (get config-map :auth-mechanism) }]
+    (println "all-configs is " all-configs)
     (into {} (filter second all-configs))))
 
 (defn parse-runner-settings
@@ -33,7 +33,7 @@
   (if-let [main-config   (into {} (get config-map :Config))]
     (let [runner-config (parse-runner-settings main-config)
           test-config   (parse-test-settings   main-config)]
-      ;; (println "parsed test-config is " test-config)
+      (println "parsed test-config is " test-config)
       { :runner-config runner-config :test-config test-config })
     { :runner-config nil :test-config nil }))
 
@@ -46,7 +46,7 @@
         merged-runner-configs (merge main-runner-config (parse-runner-settings test-element))]
     ;; (println "Test element is " test-element)
     ;; (println "Main test config is " main-test-config)
-    ;; (println "Merged test config is " merged-test-configs)
+    (println "Merged test config is " merged-test-configs)
     ;; (println "Merged runner config is " merged-runner-configs)
     (if (= (get test-element :operation) "make-degraded")
       (cond (contains? test-element :sharded-cluster) (println "Degrading sharded cluster at " (get test-element :sharded-cluster))
@@ -63,11 +63,11 @@
             (println "Error - unrecognised test function " (get test-element :operation))
             (testf (or (get test-element :replicaset) (get test-element :sharded-cluster))
                        :user (get merged-test-configs :user)
-                       :pwd (get merged-test-configs :password)
+                       :pwd (get merged-test-configs :pwd)
                        :root-ca (get merged-test-configs :root-ca)
                        :ssl (get merged-test-configs :ssl)
                        :client-cert (get merged-test-configs :client-cert)
-                       :auth-method (get merged-test-configs :auth-method))))))))
+                       :auth-mechanism (get merged-test-configs :auth-mechanism))))))))
 
 (defn exec-test
   [test main-test-config main-runner-config]
