@@ -55,8 +55,6 @@
     (with-redefs-fn {#'tester-core.core/trigger-election mock-test-reflector}
       #(let [parsed-file (impl/parse         (list "resources/trigger-test.yaml"))
              results     (impl/execute-tests parsed-file)]
-         ;; (println "parsed-file is " parsed-file)
-         ;;(println "basic-stepdown-test results are " results)
          (is (= 1 (count results)))
          (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (first results))))))))
 
@@ -79,8 +77,6 @@
     (with-redefs-fn {#'tester-core.core/simulate-maintenance mock-test-reflector}
       #(let [parsed-file (impl/parse         (list "resources/maintenance-test-with-config.yaml"))
              results     (impl/execute-tests parsed-file)]
-         ;; (println "parsed-file is " parsed-file)
-         ;; (println "basic-simulate-maintenance-with-all-config-test results are " results)
          (is (= 1 (count results)))
          (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (first results))))
          (is (= true (:ssl (first results))))
@@ -97,8 +93,6 @@
     (with-redefs-fn {#'tester-core.core/simulate-maintenance mock-test-reflector}
       #(let [parsed-file (impl/parse         (list "resources/maintenance-test.yaml"))
              results     (impl/execute-tests parsed-file)]
-         ;; (println "parsed-file is " parsed-file)
-         ;; (println "basic-simulate-maintenance-with-all-config-test results are " results)
          (is (= 1 (count results)))
          (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (first results))))
          (is (= true (:ssl (first results))))
@@ -115,8 +109,6 @@
     (with-redefs-fn {#'tester-core.core/simulate-maintenance mock-test-reflector}
       #(let [parsed-file (impl/parse         (list "resources/maintenance-test-with-override.yaml"))
              results     (impl/execute-tests parsed-file)]
-         ;; (println "parsed-file is " parsed-file)
-         ;; (println "basic-simulate-maintenance-with-all-config-test results are " results)
          (is (= 1 (count results)))
          (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (first results))))
          (is (= true (:ssl (first results))))
@@ -133,8 +125,6 @@
     (with-redefs-fn {#'tester-core.core/partial-stop-rs mock-test-reflector #'tester-core.core/make-rs-degraded mock-test-reflector }
       #(let [parsed-file (impl/parse         (list "resources/maintenance-multicmd-test.yaml"))
              results     (impl/execute-tests parsed-file)]
-         ;;(println "multicmd test results are " results " with type " (type results))
-         ;;(println "size is " (count results))
          (is (= 3 (count results)))
          (is (= "pw99" (:pwd (nth results 0))))
          (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (nth results 1))))
