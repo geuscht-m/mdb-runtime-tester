@@ -6,6 +6,7 @@ Config:
     auth-mechanism: "MONGODB-X509"
     root-ca: "test-root-ca.crt"
     client-cert: "my-client-cert.pem"
+    wait-between-tests: 5
 ---
 Test:
   - operation: simulate-maintenance

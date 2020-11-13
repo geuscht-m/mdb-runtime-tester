@@ -126,3 +126,17 @@
          (is (= "test-root-ca.crt" (:root-ca (first results))))
          (is (= "my-client-cert.pem" (:client-cert (first results))))
          ))))
+
+(deftest basic-multicommand-test
+  (testing "Check that we can pass in a list of operations and they all get processed correctly"
+    (is (.exists (io/file "resources/maintenance-multicmd-test.yaml")))
+    (with-redefs-fn {#'tester-core.core/partial-stop-rs mock-test-reflector #'tester-core.core/make-rs-degraded mock-test-reflector }
+      #(let [parsed-file (impl/parse         (list "resources/maintenance-multicmd-test.yaml"))
+             results     (impl/execute-tests parsed-file)]
+         ;;(println "multicmd test results are " results " with type " (type results))
+         ;;(println "size is " (count results))
+         (is (= 3 (count results)))
+         (is (= "pw99" (:pwd (nth results 0))))
+         (is (= "mongodb://localhost:27017,localhost:27018,localhost:27019/" (:rs-uri (nth results 1))))
+         (is (= "localhost:27107" (:rs-uri (nth results 2))))
+         ))))
