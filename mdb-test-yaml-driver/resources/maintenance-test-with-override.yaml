@@ -1,0 +1,14 @@
+---
+Config:
+  - user: "test"
+    password: "test"
+    ssl: false
+    auth-mechanism: "MONGODB-X509"
+    root-ca: "test-root-ca.crt"
+    client-cert: "my-client-cert.pem"
+---
+Test:
+  - operation: simulate-maintenance
+    replicaset: mongodb://localhost:27017,localhost:27018,localhost:27019/
+    ssl: true
+---

@@ -1,0 +1,10 @@
+Test:
+  - operation: simulate-maintenance
+    replicaset: mongodb://localhost:27017,localhost:27018,localhost:27019/
+    user: "test"
+    password: "test"
+    ssl: true
+    auth-mechanism: "MONGODB-X509"
+    root-ca: "test-root-ca.crt"
+    client-cert: "my-client-cert.pem"
+
