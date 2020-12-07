@@ -23,7 +23,7 @@
 
 ;; Local helper functions, not exposed to other namespaces
 
-(defn- run-server-status
+(defn run-server-status
   [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
   (let [conn          (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) uri)
         server-status (md/mdb-admin-command conn { :serverStatus 1 })]

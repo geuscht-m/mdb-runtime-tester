@@ -1,5 +1,6 @@
 (ns tester-core.sys-helpers-test
   (:require [tester-core.sys-helpers :refer :all]
+            [tester-core.core :refer [run-server-status]]
             [clojure.test :refer :all]
             [clojure.pprint :refer :all]))
 
@@ -16,3 +17,15 @@
   (testing "Check the result of get-os-type"
     (let [os-type (get-os-type)]
       (is (or (= os-type "Linux") (= os-type "Mac OS X") (= os-type "Windows"))))))
+
+(deftest test-get-os-type-remote
+  (testing "Check the result of remote get-os-type"
+    (let [os-type (get-os-type "rs1")]
+      (is (= os-type "Linux")))))
+
+(deftest test-is-service
+  (testing "Check if remote MongoDB was started as a service or not"
+    (let [pid (:pid (run-server-status "mongodb://rs1.mongodb.test:27017" :user "admin" :pwd "pw99"))
+          result (check-if-service "rs1.mongodb.test" pid)]
+      (is (= result false)))))
+      
