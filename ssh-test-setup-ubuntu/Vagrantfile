@@ -86,7 +86,7 @@ Vagrant.configure("2") do |config|
       end
     end
     #tester.vm.provision "file",  source: "init-replicaset.js", destination: "init-replicaset.js"
-    tester.vm.provision "shell", inline: "sudo apt-get install gnupg"
+    tester.vm.provision "shell", inline: "sudo apt-get install -y gnupg"
     tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -"
     tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
     tester.vm.provision "shell", inline: "sudo apt update"
