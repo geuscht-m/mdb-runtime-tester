@@ -7,7 +7,6 @@
 
 (deftest test-get-process-list
   (testing "Check that we can get the list of processes"
-                                        ;(doall (map #(pprint %) get-process-list))))
     (let [proc-list (get-process-list)]      
       (not (nil? proc-list))
       (is (> (count proc-list) 1))
