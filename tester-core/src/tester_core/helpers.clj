@@ -5,7 +5,7 @@
          '[tester-core.conv-helpers :as pcv]
          '[tester-core.mini-driver :as md]
          '[tester-core.os-helpers :as os]
-         '[tester-core.sys-helpers :as sys]
+         '[tester-core.sys-helpers :as sys :refer [run-remote-ssh-command is-service?]]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
          '[clj-ssh.ssh :as ssh]
@@ -30,9 +30,8 @@
   (let [handle-connection (= (type conn-info) String)
         conn          (if handle-connection (md/mdb-connect conn-info :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) conn-info)
         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-    (if handle-connection
-      (md/mdb-disconnect conn)
-      ())
+    (when handle-connection
+      (md/mdb-disconnect conn))
     server-status))
 
 (defn- run-listshards
@@ -50,7 +49,7 @@
   ;;(println "URI type is " (type uri))
   (let [conn           (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) uri)
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
-    (if (= (type uri) String)
+    (when (= (type uri) String)
       (md/mdb-disconnect conn))
     ;;(println "Returning status " replset-status)
     replset-status))
@@ -185,18 +184,18 @@
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
   [uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  ;;(println "Stopping mongo process at uri " uri " with username " user " and password " pwd)
+  (timbre/debug "Stopping mongo process at uri " uri " with username " user)
   (let [ssl-enabled   (or ssl (.contains uri "ssl=true"))
         conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
         server-status (run-server-status conn)
         cmdline       (run-server-get-cmd-line-opts conn)
-        hostname      (extract-server-name uri)]
-    (if (sys/is-service? hostname (:pid server-status))
-      (do (sys/run-remote-ssh-command hostname "sudo systemctl stop mongod")
-          (cmdline "sudo systemctl start mongod"))
+        hostname      (extract-server-name uri)
+        is-service    (sys/is-service? hostname (:pid server-status))]
+    (if is-service
+      (sys/run-remote-ssh-command hostname "sudo systemctl stop mongod")
       (run-shutdown-command conn :force-shutdown force))
     (md/mdb-disconnect conn)
-    cmdline))
+    (if is-service "sudo systemctl start mongod" cmdline)))
 
 (defn kill-mongo-process-impl
   "Implementation of kill-mongo-process that distinguishes between a local and remote process, and
@@ -205,12 +204,13 @@
   (let [conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
         cmd-line      (run-server-get-cmd-line-opts conn)
         server-status (run-server-status conn)
-        pid           (get server-status :pid)]
+        pid           (get server-status :pid)
+        is-service    (sys/is-service? (extract-server-name uri) pid)]
      (md/mdb-disconnect conn)     
      (if (is-local-process? uri)
        (os/kill-local-process pid force)
        (sys/run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid))))
-     cmd-line))
+     (if is-service "sudo systemctl start mongod" cmd-line)))
     
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
