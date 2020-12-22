@@ -27,7 +27,7 @@
   (testing "Check if remote MongoDB was started as a service or not"
     (ssh-apply-command-to-rs-servers "./start-mongod-replset-node.sh" (list "rs1.mongodb.test"))
     (let [pid (:pid (run-server-status "mongodb://rs1.mongodb.test:27017" :user "admin" :pwd "pw99"))
-          result (check-if-service "rs1.mongodb.test" pid)]
+          result (is-service? "rs1.mongodb.test" pid)]
       (is (= result false)))
     (ssh-apply-command-to-rs-servers "pkill mongod" (list "rs1.mongodb.test"))))
 
@@ -36,6 +36,6 @@
   (testing "Make sure we correcty identify a mongod that was started as a service"
     (ssh-apply-command-to-rs-servers "sudo systemctl start mongod" (list "rs1.mongodb.test"))
     (let [pid (:pid (run-server-status "mongodb://rs1.mongodb.test:27107"))
-          result (check-if-service "rs1.mongodb.test" pid)]
+          result (is-service? "rs1.mongodb.test" pid)]
       (is (= result true)))
     (ssh-apply-command-to-rs-servers "sudo systemctl stop mongod" (list "rs1.mongodb.test"))))

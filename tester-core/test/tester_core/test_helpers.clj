@@ -1,10 +1,17 @@
 (ns tester-core.test-helpers
   (:require [tester-core.core :refer :all]
-            [tester-core.sys-helpers :refer :all]
+            [tester-core.sys-helpers :as sys :refer :all]
             [tester-core.mini-driver :as md :refer :all]
             [clj-ssh.ssh :as ssh :refer :all]
-            [clojure.set :refer :all])
+            [clojure.set :refer :all]
+            [taoensso.timbre :as timbre :refer :all])
   (:import  [com.mongodb ReadPreference]))
+
+(defn setup-logging-fixture
+  [f]
+  (timbre/debug "setting up logging")
+  (timbre/merge-config! {:min-level `[[#{"org.mongodb.*"} :error] [#{"*"} :warn]]})
+  (f))
 
 
 (defn available-mongods
@@ -152,4 +159,6 @@
 
 (defn ssh-apply-command-to-rs-servers
   [cmd servers]
-  (doall (map #(run-remote-ssh-command % cmd) servers)))
+  (timbre/debug "ssh-apply-command-to-rs-servers: trying to apply command " cmd " of type " (type cmd) " to servers " servers)
+  (doall (map #(sys/run-remote-ssh-command % cmd) servers)))
+

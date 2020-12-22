@@ -5,9 +5,11 @@
          '[tester-core.conv-helpers :as pcv]
          '[tester-core.mini-driver :as md]
          '[tester-core.os-helpers :as os]
+         '[tester-core.sys-helpers :as sys]
          '[clojure.java.shell :refer [sh]]
          '[clojurewerkz.urly.core :as urly]
-         '[clj-ssh.ssh :as ssh])
+         '[clj-ssh.ssh :as ssh]
+         '[taoensso.timbre :as timbre :refer [debug]])
 (import  [com.mongodb ReadPreference]
          [com.mongodb.client MongoClient])
 
@@ -24,11 +26,13 @@
 ;; Local helper functions, not exposed to other namespaces
 
 (defn run-server-status
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  (let [conn          (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) uri)
+  [conn-info & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
+  (let [handle-connection (= (type conn-info) String)
+        conn          (if handle-connection (md/mdb-connect conn-info :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) conn-info)
         server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-    (if (= (type uri) String)
-      (md/mdb-disconnect conn))
+    (if handle-connection
+      (md/mdb-disconnect conn)
+      ())
     server-status))
 
 (defn- run-listshards
@@ -62,7 +66,7 @@
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
   [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
-  (println "Attempting to step down primary at " uri " with user " user " and root-ca " root-ca)
+  (timbre/debug "Attempting to step down primary at " uri " with user " user " and root-ca " root-ca)
   (let [conn (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
     (try
       (md/mdb-admin-command conn { :replSetStepDown 120 })
@@ -81,38 +85,17 @@
   (try
     (md/mdb-admin-command conn-info { :shutdown 1 :force force-shutdown })
     (catch com.mongodb.MongoSocketReadException e
-      (println "Exception caught as expected"))
+      (timbre/debug "Socket exception caught as expected on shutdown"))
     (catch java.lang.NullPointerException e
-      (println "Caught NullPointerException"))
+      (timbre/info "Caught NullPointerException"))
     (catch java.lang.RuntimeException e
-      (println "Caught RuntimeException"))))
+      (timbre/info "Caught RuntimeException"))))
 
-(defn- build-cmd-line-string
-  [cmdline]
-  ;;(println "cmdline type is " (type cmdline))
-  (if (sequential? cmdline)
-    (str/join " " cmdline)
-    cmdline))
-
-(defn- run-remote-ssh-command
-  "Execute a command described by cmdline on the remote server 'server'"
-  [server cmdline]
-  ;;(println "\nAttempting to run ssh command " cmdline "\n")
-  (let [agent   (ssh/ssh-agent {})
-        session (ssh/session agent server {:strict-host-key-checking :no})]
-    (ssh/with-connection session
-      (let [result (ssh/ssh session { :cmd (build-cmd-line-string cmdline) })]
-        (get result :exit)))))
 
 (defn- run-server-get-cmd-line-opts
   "Retrieve the server's command line options. Accepts either a uri or a MongoClient"
   [^MongoClient conn]
   (md/mdb-admin-command conn { :getCmdLineOpts 1 }))
-
-;; (defn- run-server-status
-;;   "Run the serverStatus command and return the result as a map"
-;;   [^MongoClient conn]
-;;   (md/mdb-admin-command conn { :serverStatus 1 }))
 
 ;; Replica set topology functions to
 ;; - Retrieve the connection URI for the primary/secondaries
@@ -193,21 +176,27 @@
    that the code is connecting with needs to have
    the appropriate privileges to start processes
    on the remote server."
-   [uri cmdline]
-  (run-remote-ssh-command (extract-server-name uri) cmdline))
+  [uri cmdline]
+  (timbre/debug "start-remote-mongo-process: type of URI is " (type uri) ", uri is " uri ", type of cmdline is " (type cmdline) "\n")
+  (sys/run-remote-ssh-command (extract-server-name uri) cmdline))
 
 (defn stop-mongo-process-impl
   "Behind the scenes implementation of mongo process shutdown.
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
-  ([uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-   ;;(println "Stopping mongo process at uri " uri " with username " user " and password " pwd)
-   (let [ssl-enabled (or ssl (.contains uri "ssl=true"))
-         conn (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
-         cmdline (run-server-get-cmd-line-opts conn)]
-     (run-shutdown-command conn :force-shutdown force)
-     (md/mdb-disconnect conn)
-     cmdline)))
+  [uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
+  ;;(println "Stopping mongo process at uri " uri " with username " user " and password " pwd)
+  (let [ssl-enabled   (or ssl (.contains uri "ssl=true"))
+        conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+        server-status (run-server-status conn)
+        cmdline       (run-server-get-cmd-line-opts conn)
+        hostname      (extract-server-name uri)]
+    (if (sys/is-service? hostname (:pid server-status))
+      (do (sys/run-remote-ssh-command hostname "sudo systemctl stop mongod")
+          (cmdline "sudo systemctl start mongod"))
+      (run-shutdown-command conn :force-shutdown force))
+    (md/mdb-disconnect conn)
+    cmdline))
 
 (defn kill-mongo-process-impl
   "Implementation of kill-mongo-process that distinguishes between a local and remote process, and
@@ -220,7 +209,7 @@
      (md/mdb-disconnect conn)     
      (if (is-local-process? uri)
        (os/kill-local-process pid force)
-       (run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid))))
+       (sys/run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid))))
      cmd-line))
     
 (defn get-random-members
@@ -280,10 +269,3 @@
   "On functions that return a closure, execute the closure"
   [returned-closure]
   (returned-closure))
-
-(defn get-server-cmdline
-  "Retrieve the command line used to start this particular server process"
-  ([server-uri]
-   (get (run-server-get-cmd-line-opts server-uri) :argv))
-  ([server-uri ^String user ^String password]
-   (get (run-server-get-cmd-line-opts server-uri user password) :argv)))

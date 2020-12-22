@@ -27,6 +27,7 @@
   (is (= 0 (num-running-mongo-processes))))
 
 (use-fixtures :each wrap-rs-tests)
+(use-fixtures :once setup-logging-fixture)
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
@@ -47,12 +48,12 @@
           primary      (get (get-rs-primary conn) :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries conn)))]
       ;;(println "Local primary is " primary)
-      (println "Topology - secondaries are " secondaries)
+      ;;(timbre/debug "Topology - secondaries are " secondaries)
       (is (= 5 (num-active-rs-members conn)))
       (md/mdb-disconnect conn)
       (is (some? (or (re-matches #"localhost:2701[7-9]" primary) (re-matches #"localhost:2702[1-2]" primary))))
       (is (not (some #{primary} secondaries)))
-      (println "Secondaries are " secondaries)
+      ;;(timbre/debug "Secondaries are " secondaries)
       (is (= 4 (count secondaries))))))
 
 

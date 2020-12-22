@@ -31,7 +31,8 @@
   (let [ssl-enabled  (or ssl (.contains rs-uri "ssl=true"))
         stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
         restart-info (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) stop-members))]
-    ;;(println "\nRestart info" restart-info)
+    (timbre/debug "partial-stop-rs: restart info is " (str restart-info))
+    ;;(flush)
     (fn [] (if (seq? restart-info)
              (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
              (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))

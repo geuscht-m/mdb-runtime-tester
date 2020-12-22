@@ -8,29 +8,23 @@
   (:require [clojure.test :refer :all]
             [tester-core.core :refer :all]
             [tester-core.test-helpers :refer :all]
-            [tester-core.mini-driver :as md :refer :all]))
-
-(defn- start-remote-mongods
-  [servers]
-  (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-x509.conf" servers))
-
-(defn- stop-remote-mongods
-  [servers]
-  (ssh-apply-command-to-rs-servers "pkill mongod" servers))
+            [tester-core.mini-driver :as md :refer :all]
+            [taoensso.timbre :as timbre :refer [debug error]]))
 
 (defn- ssh-test-fixture
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
     (is (= 0 (num-running-mongo-processes servers)))
-    (start-remote-mongods servers)
+    (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-x509.conf" servers)
     (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&ssl=true" 3 17 :client-cert "../../../tls/user-cert.pem" :ssl true :root-ca "../../../tls/root.crt" :auth-mechanism :mongodb-x509)
       (f)
-      (println "Test replica set not ready in time"))
-    (stop-remote-mongods servers)
+      (timbre/error "Test replica set not ready in time"))
+    (ssh-apply-command-to-rs-servers "pkill mongod" servers)    
     (wait-mongo-shutdown servers 20)))
 
 (use-fixtures :each ssh-test-fixture)
+(use-fixtures :once setup-logging-fixture)
 
 (deftest test-is-mongos-process
   (testing "Check if we're running against a mongos process - should fail as we're running mongod"
