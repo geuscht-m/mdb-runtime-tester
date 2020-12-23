@@ -30,11 +30,16 @@
   [rs-uri member-num & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
   (let [ssl-enabled  (or ssl (.contains rs-uri "ssl=true"))
         stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
-        restart-info (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) stop-members))]
-    ;;(println "\nRestart info" restart-info)
-    (fn [] (if (seq? restart-info)
-             (doall (map #(start-mongo-process (get % :uri) (get % :cmd-line)) restart-info))
-             (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))
+        restart-info (into () (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) stop-members)))]
+    (timbre/debug "partial-stop-rs: restart info is " restart-info)
+    ;;(flush)
+    (fn [] (do (timbre/debug "Attempting to execute restart function with info " restart-info)
+               (if (seq? restart-info)
+                 (doall (map (fn[info]
+                               (do (timbre/debug "Calling restart function with list of  parameters " info)
+                                   (start-mongo-process (get info :uri) (get info :cmd-line)))) restart-info))
+                 (do (timbre/debug "Calling restart function with parameters " restart-info)
+                     (start-mongo-process (get restart-info :uri) (get restart-info :cmd-line))))))))
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"

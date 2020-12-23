@@ -59,6 +59,8 @@ Vagrant.configure("2") do |config|
       SSHD_CONFIG
       node.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh/ ] || mkdir /home/vagrant/.ssh", privileged: false
       node.vm.provision "shell", inline: "echo #{insecure_ssh_pub_key} >> /home/vagrant/.ssh/authorized_keys", privileged: false
+      node.vm.provision "shell", inline: "sudo sed -i 's/bindIp: 127.0.0.1/bindIpAll: true/' /etc/mongod.conf"
+      node.vm.provision 'shell', inline: "sudo sed -i 's/port: 27017/port: 27107/' /etc/mongod.conf"
       node.vm.provision "shell", inline: 'sudo systemctl stop mongod && sudo systemctl disable mongod'
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
@@ -115,11 +117,9 @@ Vagrant.configure("2") do |config|
   config.vm.define "rs-3" do |rs_node|
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:27017 init-replicaset.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:28017 --ssl --sslCAFile tls/root.crt init-replicaset-ssl.js', privileged: false
-    #rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:29017 --ssl --sslCAFile tls/root.crt init-replicaset-x509.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://localhost:29017 init-replicaset-x509.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:27017,rs3.mongodb.test:27017/admin?replicaSet=replTest create-test-user.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:28017,rs3.mongodb.test:28017/admin?replicaSet=replTestTLS --ssl --sslCAFile tls/root.crt create-test-user.js', privileged: false
-    #rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:29017,rs3.mongodb.test:29017/admin?replicaSet=replTestX509 --ssl --sslCAFile tls/root.crt create-test-user-x509.js', privileged: false
     rs_node.vm.provision 'shell', inline: 'mongo mongodb://rs1.mongodb.test:29017,rs3.mongodb.test:29017/admin?replicaSet=replTestX509 create-test-user-x509.js', privileged: false
   end
 

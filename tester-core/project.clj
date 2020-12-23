@@ -9,7 +9,7 @@
   :dependencies [[org.clojure/clojure           "1.10.0"]
                  [org.mongodb/mongodb-driver-sync "3.12.6"]
                  [clojurewerkz/urly             "1.0.0"]
-                 [com.taoensso/timbre           "4.10.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
+                 [com.taoensso/timbre           "5.1.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre     "0.3.14"] ;; Attempt to send all log output through timbre
                  [org.slf4j/jul-to-slf4j        "1.7.14"]
                  ;;[org.clojure/tools.trace       "0.7.10"]

@@ -40,6 +40,7 @@
   (wait-mongo-shutdown 40))
 
 (use-fixtures :each wrap-sharded-tests)
+(use-fixtures :once setup-logging-fixture)
 
 (deftest test-get-config-servers-uri
   (testing "Try to retrieve the URIs of the config servers"

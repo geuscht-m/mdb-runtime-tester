@@ -222,7 +222,7 @@
              ;; (let [converted (pcv/from-bson-document result true)]
              ;;   (println "Converted result is " converted)
              ;;   converted)))
-          (do (println "Received MongoCommandException " e)
+          (do ;;(println "Received MongoCommandException " e)
               (throw e)))))))
 
 (defn mdb-admin-command
