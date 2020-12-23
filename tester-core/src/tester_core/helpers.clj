@@ -18,10 +18,16 @@
 
 (defn make-mongo-uri
   [^String hostinfo]
-  ;;(println "make-mongo-uri " hostinfo)
+  (timbre/debug "Trying to create mongodb uri from " hostinfo)
   (if (str/starts-with? hostinfo "mongodb://")
     hostinfo
     (str "mongodb://" hostinfo)))
+
+(defn is-mongodb-uri?
+  "Check if the string in maybe-uri conforms to the general
+   MongoDB URI format or not"
+  [^String maybe-uri]
+  (re-matches #"^mongodb://.*" maybe-uri))
 
 ;; Local helper functions, not exposed to other namespaces
 
@@ -51,7 +57,7 @@
         replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
     (when (= (type uri) String)
       (md/mdb-disconnect conn))
-    ;;(println "Returning status " replset-status)
+    ;;(timbre/debug "Returning replset status " replset-status)
     replset-status))
 
 (defn- run-get-shard-map
@@ -102,7 +108,7 @@
 (defn- get-rs-members-by-state
   [uri state & { :keys [ user pwd read-pref ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil read-pref nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
   (let [member-state (get (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :members)]
-    ;;(println " get-member-by state " state " returned: " member-state "\n")
+    (timbre/trace " get-member-by state " state " for URI " uri " returned: " member-state)
     (filter #(= (get % :stateStr) state) member-state)))
 
 (defn get-rs-primary
@@ -133,14 +139,16 @@
 (defn is-local-process?
   "Check if the mongo process referenced by the URI is local or not"
   [uri]
-  (let [parsed-uri (urly/url-like (make-mongo-uri uri))
-        hostname   (os/get-hostname)]
-    (or (= (urly/host-of parsed-uri) "localhost") (= (urly/host-of parsed-uri) hostname))))
+  (let [uri-host (urly/host-of (urly/url-like (make-mongo-uri uri)))
+        hostname   (os/get-hostname)]`
+    (timbre/debug "Checking if process on uri-host " uri-host " is local or not")
+    (or (= uri-host "localhost") (= uri-host hostname))))
 
 (defn check-process-type
   "Retrieve the process type from serverstatus"
   [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
-  ;;(println "Trying to get process type for uri " uri " with user " user " and root-ca " root-ca)
+  (timbre/debug "Trying to get process type for uri " uri " with user " user " and root-ca " root-ca)
+  (timbre/debug "Type of URI parameter is " (type uri))
   (if (= (type uri) String)
       (let [ssl-enabled (or ssl (.contains uri "ssl=true"))]
       ;;(get-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
@@ -150,7 +158,10 @@
 (defn is-mongod-process?
   "Check if the process referenced by the startup is a mongod process"
   [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-  (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) "mongod"))
+  (timbre/debug "Checking if process at " uri " is a mongod or mongos process")
+  (if (or (vector? uri) (is-mongodb-uri? uri))
+    (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) "mongod")
+    (or (= (first uri) "mongod") (and (str/includes? uri "systemctl") (str/includes? uri "mongod")))))
 
 (defn is-mongos-process?
   "Check if the process referenced by the parameters seq is a mongos process"
@@ -158,7 +169,7 @@
   (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) "mongos"))
 
 (defn start-local-mongo-process [uri process-settings]
-  ;;(println "\nStarting local mongo process on uri " uri " with parameters " process-settings)
+  (timbre/debug "Starting local mongo process on uri " uri " with parameters " process-settings)
   (os/spawn-process process-settings))
 
 
@@ -195,7 +206,7 @@
       (sys/run-remote-ssh-command hostname "sudo systemctl stop mongod")
       (run-shutdown-command conn :force-shutdown force))
     (md/mdb-disconnect conn)
-    (if is-service "sudo systemctl start mongod" cmdline)))
+    (if is-service { :argv "sudo systemctl start mongod" } cmdline)))
 
 (defn kill-mongo-process-impl
   "Implementation of kill-mongo-process that distinguishes between a local and remote process, and
@@ -210,7 +221,7 @@
      (if (is-local-process? uri)
        (os/kill-local-process pid force)
        (sys/run-remote-ssh-command (extract-server-name uri) (if force (str "kill -9 " pid) (str "kill " pid))))
-     (if is-service "sudo systemctl start mongod" cmd-line)))
+     (if is-service { :argv "sudo systemctl start mongod" } cmd-line)))
     
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"

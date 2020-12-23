@@ -13,6 +13,12 @@
   (timbre/merge-config! {:min-level `[[#{"org.mongodb.*"} :error] [#{"*"} :warn]]})
   (f))
 
+(defn setup-logging-fixture-debug
+  [f]
+  (timbre/debug "setting up logging")
+  (timbre/merge-config! {:min-level `[[#{"org.mongodb.*"} :error] [#{"clj-ssh.*"} :warn] [#{"*"} :debug]]})
+  (f))
+
 
 (defn available-mongods
   "Try to create a list of available mongods on the current machine"
