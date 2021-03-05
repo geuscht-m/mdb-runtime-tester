@@ -1,7 +1,8 @@
 (ns tester-core.mini-driver
   (:require [tester-core.conv-helpers :as pcv]
             [clojure.string           :as str]
-            [clj-pem-decoder.core     :as pem :refer :all]))
+            [clj-pem-decoder.core     :as pem :refer :all]
+            [taoensso.timbre :as timbre :refer [debug]]))
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
         [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block MongoCommandException]
         [com.mongodb.connection SslSettings]
@@ -168,7 +169,7 @@
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
-  ;;(println "Attempting to connect to " mongo-uri)
+  (timbre/debug "Attempting to connect to " mongo-uri)
   ;;(println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
   (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
