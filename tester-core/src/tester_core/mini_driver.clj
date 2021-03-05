@@ -169,17 +169,18 @@
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
-  (timbre/debug "Attempting to connect to " mongo-uri)
-  ;;(println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
+  (println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl ", root-ca " root-ca ", client-cert " client-cert ", auth-mechanism " auth-mechanism)
   (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
     ;; Connect either without user information, or all of the authentication information
     ;; encoded in the URI connection string
-    (let [ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))]
-      (cond (nil? user) (if ssl-enabled
-                          (create-client-with-ssl mongo-uri ssl-enabled root-ca)
-                          (MongoClients/create (ConnectionString. mongo-uri)))
-            (and (not (nil? user))
-                 (not (nil? pwd))) (create-scram-client-with-ssl mongo-uri user pwd ssl-enabled root-ca)))
+    (do
+      (println "Trying to connect with SCRAM-SHA")
+      (let [ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))]
+        (cond (nil? user) (if ssl-enabled
+                            (create-client-with-ssl mongo-uri ssl-enabled root-ca)
+                            (MongoClients/create (ConnectionString. mongo-uri)))
+              (and (not (nil? user))
+                   (not (nil? pwd))) (create-scram-client-with-ssl mongo-uri user pwd ssl-enabled root-ca))))
     (cond (and (= auth-mechanism :mongodb-x509) (nil? user))
           (create-x509-client-with-ssl-and-client-cert mongo-uri root-ca client-cert)
           (and (= auth-mechanism :mongodb-x509)
@@ -188,7 +189,7 @@
                                         (.applyConnectionString (ConnectionString. mongo-uri))
                                         (.credential (MongoCredential/createMongoX509Credential user))
                                         (.build)))
-          false (println "Unsupported authentication method " auth-mechanism))))
+          false (timbre/error "Unsupported authentication method " auth-mechanism))))
 
 (defn mdb-disconnect
   "Close an existing connection to a MongoDB cluster"
