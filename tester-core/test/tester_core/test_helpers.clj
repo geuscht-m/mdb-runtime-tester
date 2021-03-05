@@ -2,7 +2,7 @@
   (:require [tester-core.core :refer :all]
             [tester-core.sys-helpers :as sys :refer :all]
             [tester-core.mini-driver :as md :refer :all]
-            [clj-ssh.ssh :as ssh :refer :all]
+;;            [clj-ssh.ssh :as ssh :refer :all]
             [clojure.set :refer :all]
             [taoensso.timbre :as timbre :refer :all])
   (:import  [com.mongodb ReadPreference]))
@@ -30,14 +30,13 @@
   ([]
    (let [processes (get-process-list)
          running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
-     ;;(println "currently running mongo processes " running)
+     (timbre/trace "currently running mongo processes " running)
      (count running)))
   ([server-list]
    (let [processes (apply clojure.set/union (get-process-list server-list))]
-     ;; (println "type of processes " (type processes))
-     ;; (println "num-running-mongo-processes - processes are " processes)
+     ;;(timbre/trace "type of processes " (type processes) ", num-running-mongo-processes - processes are " processes)
      (let [running   (filter (fn [entry] (re-find #"^mongo[ds]\s+" (get entry :command-line))) processes)]
-       ;;(println "Running mongo processes are " running)
+       ;;(timbre/trace "Running mongo processes are " running)
        (count running)))))
 
 (defn wait-mongo-shutdown
@@ -48,21 +47,21 @@
        (Thread/sleep 500)
        (reset! retries (inc @retries)))
      (if (>= @retries max-retries)
-       (println "Unable to shut down remaining mongo processes, aborting"))))
+       (timbre/warn "Unable to shut down remaining mongo processes, aborting"))))
   ([server-list max-retries]
    (let [retries (atom 0)]
      (while (and (> (num-running-mongo-processes server-list) 0) (< @retries max-retries))
-       (do ;;(println "Waiting for remote mongo process to shut down, attempt " @retries)
+       (do
+         (timbre/debug "Waiting for remote mongo process to shut down, attempt " @retries)
          (Thread/sleep 500)
          (reset! retries (inc @retries))))
      (if (>= @retries max-retries)
-       (println "Unable to shut down remaining mongod processes")))))
+       (timbre/warn "Unable to shut down remaining mongod processes")))))
 
 (defn mongodb-port-list
   "Given a process list, retrieve the list of mongod/mongos port numbers of active
    processes"
   [process-list]
-  ;;(println process-list)
   (doall (map #(nth (re-matches #".+--port\s+(\d+).*" (get % :command-line)) 1) process-list)))
 
 (defn- convert-shard-uri-to-mongo-uri
@@ -70,18 +69,17 @@
    MongoDB understands"
   [shard-uri]
   (let [uri-parts (re-matches #"shard\d+/(.*)" shard-uri)]
-    ;;(println "shard uri conversion - uri parts are " uri-parts)
+    (timbre/trace "shard uri conversion - uri parts are " uri-parts)
     (if (not (nil? uri-parts))
       (make-mongo-uri (nth uri-parts 1))
       nil)))
 
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
-  [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-   (let [rs-status (get (run-replset-get-status rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :read-preference (ReadPreference/primaryPreferred) :client-cert client-cert :auth-mechanism auth-mechanism) :members)
+  [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+   (let [rs-status (get (run-replset-get-status rs-uri :read-preference (ReadPreference/primaryPreferred) (mapcat identity opts) :members)
          degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
-     ;;(println "\nReplica set status is " rs-status)
-     ;;(println "degraded is " (some identity degraded) "\n")
+     (timbre/trace "Replica set status is " rs-status ", degraded is " (some identity degraded))
      (some true? degraded)))
      
 (defn replicaset-ready?
@@ -99,12 +97,9 @@
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
-  ;;[rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
   [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
    (let [retries (atom 0)]
-     ;;(while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)) (< @retries max-retries))
      (while (and (not (apply replicaset-ready? rs-uri num-mem (mapcat identity opts))) (< @retries max-retries))
-       ;;(println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
        )
@@ -113,16 +108,14 @@
 
 (defn replica-set-read-only?
   "Check if the replica set is read only by checking if it has no primary)"
-  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } } ]
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts } ]
   (let [mongo-uri   (make-mongo-uri rs-uri)
-        ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))
-        primary     (get-rs-primary mongo-uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
+        primary     (get-rs-primary mongo-uri (mapcat indentity opts))]
     (nil? primary)))
   
 
 (defn shard-degraded?
   ([shard-uri]
-   ;;(println "\n" (get (run-replset-get-status (make-mongo-uri shard-uri)) :members)))
    (replicaset-degraded? shard-uri))
   ([shard-uri ^String user ^String pw]
    (replicaset-degraded? shard-uri user pw)))
@@ -139,8 +132,7 @@
   "Check that all shards on a cluster are in degraded state"
   [cluster-uri]
   (let [shard-list (get-shard-uris cluster-uri)]
-    ;;(println "Check shard list for cluster degradation at uri " cluster-uri)
-    ;;(println "Shard list is " shard-list)
+    (timbre/trace "Check shard list " shard-list " for cluster degradation at uri " cluster-uri)
     (every? true? (map #(replicaset-degraded? %) shard-list))))
 
 (defn shards-read-only?
@@ -149,7 +141,6 @@
   (if (seq? uri)
     (every? true? (map replica-set-read-only? uri))
     (let [shards (get-shard-uris uri)]
-      (println "\nShards: " shards "\n")
       (every? true? (doall (map #(replica-set-read-only? (convert-shard-uri-to-mongo-uri %)) shards))))))
 
 ;;
