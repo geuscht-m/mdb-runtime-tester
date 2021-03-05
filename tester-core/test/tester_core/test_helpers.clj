@@ -86,8 +86,8 @@
      
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
-  [rs-uri num-nodes & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-  (let [conn (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [rs-uri num-nodes & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts}]
+  (let [conn (apply md/mdb-connect rs-uri (mapcat identity opts))
         num-active (num-active-rs-members conn)
         primary    (get-rs-primary conn)]
     (md/mdb-disconnect conn)
@@ -99,9 +99,11 @@
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
    have to play with timeouts all the time"
-  [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
+  ;;[rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
+  [rs-uri num-mem max-retries & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
    (let [retries (atom 0)]
-     (while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)) (< @retries max-retries))
+     ;;(while (and (not (replicaset-ready? rs-uri num-mem :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)) (< @retries max-retries))
+     (while (and (not (apply replicaset-ready? rs-uri num-mem (mapcat identity opts))) (< @retries max-retries))
        ;;(println "Waiting for test environment at " rs-uri " with user " user ", pwd " pwd " and root-ca " root-ca " to get ready")
        (reset! retries (inc @retries))
        (Thread/sleep 1100)
