@@ -1,4 +1,4 @@
-(ns tester-core.core-test-replicaset
+(ns tester-core.core-replicaset-test
   (:require [clojure.test :refer :all]
             [tester-core.core :refer :all]
             [tester-core.sys-helpers :refer :all]

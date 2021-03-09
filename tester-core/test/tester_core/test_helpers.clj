@@ -77,7 +77,7 @@
 (defn replicaset-degraded?
   "Check if the replica set has at least one node that is in (not reachable/healthy) state"
   [rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
-   (let [rs-status (get (run-replset-get-status rs-uri :read-preference (ReadPreference/primaryPreferred) (mapcat identity opts) :members)
+   (let [rs-status (:members (apply run-replset-get-status rs-uri :read-preference (ReadPreference/primaryPreferred) (mapcat identity opts)))
          degraded  (map #(= (get % :stateStr) "(not reachable/healthy)") rs-status)]
      (timbre/trace "Replica set status is " rs-status ", degraded is " (some identity degraded))
      (some true? degraded)))
@@ -85,9 +85,9 @@
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
   [rs-uri num-nodes & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts}]
-  (let [conn (apply md/mdb-connect rs-uri (mapcat identity opts))
-        num-active (num-active-rs-members conn)
-        primary    (get-rs-primary conn)]
+  (let [conn       (apply md/mdb-connect rs-uri (mapcat identity opts))
+        num-active (apply num-active-rs-members conn (mapcat identity opts))
+        primary    (apply get-rs-primary conn (mapcat identity opts))]
     (md/mdb-disconnect conn)
     (and (= num-active num-nodes)
          (some? primary))))
@@ -110,7 +110,7 @@
   "Check if the replica set is read only by checking if it has no primary)"
   [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts } ]
   (let [mongo-uri   (make-mongo-uri rs-uri)
-        primary     (get-rs-primary mongo-uri (mapcat indentity opts))]
+        primary     (apply get-rs-primary mongo-uri (mapcat identity opts))]
     (nil? primary)))
   
 

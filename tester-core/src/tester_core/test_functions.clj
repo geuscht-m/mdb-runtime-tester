@@ -43,19 +43,17 @@
 
 (defn make-rs-degraded
   "Simulate a degraded but fully functional RS (majority of nodes still available"
-  ([rs-uri & { :keys [ ^String user ^String pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil }}]
-   ;;(println "make-rs-degraded called with URI " rs-uri " and user " user ", password " pwd ", root-ca " root-ca)
-   (let [num-members (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+  ;;(println "make-rs-degraded called with URI " rs-uri " and user " user ", password " pwd ", root-ca " root-ca)
+  (let [num-members  (apply get-num-rs-members rs-uri (mapcat identity opts))
          stop-rs-num (quot num-members 2)]
-     ;;(println "Stopping n servers out of m servers " stop-rs-num num-members)
-     ;;(println "\nStopping RS members from uri " rs-uri "\n")
-     (partial-stop-rs rs-uri stop-rs-num :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism))))
+    (apply partial-stop-rs rs-uri stop-rs-num (mapcat identity opts))))
 
 (defn make-rs-read-only
   "Shut down the majority of the nodes so the RS goes read only. Returns a list of stopped replica set members."
-  ([rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-   ;;(println "\nMaking replica set read only " rs-uri "\n")
-   (partial-stop-rs rs-uri (+ (quot (get-num-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) 2) 1) :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+  ;;(println "\nMaking replica set read only " rs-uri "\n")
+  (apply partial-stop-rs rs-uri (+ (quot (apply get-num-rs-members rs-uri (mapcat identity opts)) 2) 1) (mapcat identity opts)))
 
 (defn make-shard-degraded
   "Simulate a single degraded shard on a sharded cluster"

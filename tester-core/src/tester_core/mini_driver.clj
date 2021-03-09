@@ -92,14 +92,14 @@
                                                  (.build)))))
        (.build))))
 
-(defn- create-ssl-mongo-client-scram-no-ssl-context
+(defn- ^MongoClient create-ssl-mongo-client-scram-no-ssl-context
   [mongo-uri ssl user pwd]
   (let [settings (ConnectionString. mongo-uri)]
     (if (nil? user)
-      (do (println "Creating unauthenticated connection to uri " mongo-uri)
+      (do (timbre/debug "Creating unauthenticated connection to uri " mongo-uri)
           (MongoClients/create settings))
-      (let cred     [(MongoCredential/createCredential user "admin" (char-array pwd))]
-           ;;(println "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
+      (let [cred (MongoCredential/createCredential user "admin" (char-array pwd))]
+           (println "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
            (MongoClients/create
             (-> (MongoClientSettings/builder)
                 (.applyConnectionString (ConnectionString. mongo-uri))                                          
@@ -172,11 +172,11 @@
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
-  (println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl ", root-ca " root-ca ", client-cert " client-cert ", auth-mechanism " auth-mechanism)
+  (timbre/debug "Trying to connect to " mongo-uri " with user " user ", ssl " ssl ", root-ca " root-ca ", client-cert " client-cert ", auth-mechanism " auth-mechanism)
   (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
     (if (nil? root-ca)
       (create-ssl-mongo-client-scram-no-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd)
-      (create-ssl-mongo-client-scram-with-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd root-ca)
+      (create-ssl-mongo-client-scram-with-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd root-ca))
     (cond (and (= auth-mechanism :mongodb-x509) (nil? user))
           (create-x509-client-with-ssl-and-client-cert mongo-uri root-ca client-cert)
           (and (= auth-mechanism :mongodb-x509)
@@ -220,7 +220,7 @@
              ;; (let [converted (pcv/from-bson-document result true)]
              ;;   (println "Converted result is " converted)
              ;;   converted)))
-          (do ;;(println "Received MongoCommandException " e)
+          (do (timbre/warn "Received MongoCommandException " e)
               (throw e)))))))
 
 (defn mdb-admin-command

@@ -32,11 +32,13 @@
 ;; Local helper functions, not exposed to other namespaces
 
 (defn run-server-status
-  [conn-info & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  (let [handle-connection (= (type conn-info) String)
-        conn          (if handle-connection (md/mdb-connect conn-info :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) conn-info)
-        server-status (md/mdb-admin-command conn { :serverStatus 1 })]
-    (when handle-connection
+  "Execute server status command on the designated server
+   Either takes a MongoClient or a string for conn-info, plus optional arguments"
+  [conn-info & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts } ]
+  (let [manage-connection (= (type conn-info) String)
+        conn              (if manage-connection (apply md/mdb-connect conn-info (mapcat identity opts)) conn-info)
+        server-status     (md/mdb-admin-command conn { :serverStatus 1 })]
+    (when manage-connection
       (md/mdb-disconnect conn))
     server-status))
 
@@ -50,14 +52,14 @@
 
 (defn run-replset-get-status
   "Returns the result of Mongodb's replSetGetStatus admin command"
-  [uri & { :keys [ read-preference user pwd ssl root-ca client-cert auth-mechanism ] :or { read-preference nil user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  ;;(println "Trying to run replset-get-status on " uri " with user " user " and password " pwd)
-  ;;(println "URI type is " (type uri))
-  (let [conn           (if (= (type uri) String) (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) uri)
-        replset-status (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
-    (when (= (type uri) String)
+  [uri & { :keys [ read-preference user pwd ssl root-ca client-cert auth-mechanism ] :as opts } ]
+  (let [manage-connection (= (type uri) String)
+        conn              (if (not manage-connection) uri (apply md/mdb-connect uri (mapcat identity opts)))
+        replset-status    (md/mdb-admin-command conn {:replSetGetStatus 1} :readPreference read-preference)]
+    ;;(println "repl-status is " replset-status)
+    (when manage-connection
       (md/mdb-disconnect conn))
-    ;;(timbre/debug "Returning replset status " replset-status)
+    (timbre/trace "Returning replset status " replset-status)
     replset-status))
 
 (defn- run-get-shard-map
@@ -106,16 +108,16 @@
 ;; - Retrieve the connection URI for the primary/secondaries
 ;; - Get the number of nodes in an RS
 (defn- get-rs-members-by-state
-  [uri state & { :keys [ user pwd read-pref ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil read-pref nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  (let [member-state (get (run-replset-get-status uri :user user :pwd pwd :read-preference read-pref :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :members)]
-    (timbre/trace " get-member-by state " state " for URI " uri " returned: " member-state)
-    (filter #(= (get % :stateStr) state) member-state)))
+  [uri state & { :keys [ user pwd read-preference ssl root-ca client-cert auth-mechanism ] :as opts } ]
+  (let [status (apply run-replset-get-status uri (mapcat identity opts))]
+    (filter #(= (get % :stateStr) state) (:members status))))
 
 (defn get-rs-primary
   "Retrieve the primary from a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri & { :keys [ read-pref user pwd ssl root-ca client-cert auth-mechanism] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  ;;(println "Getting primary for rs " uri " with user " user ", root-ca " root-ca " and password " pwd)
-  (first (get-rs-members-by-state uri "PRIMARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism read-preference ] :as opts }]
+  (timbre/trace "Trying to determine primary for replicaset" uri "with opts" opts)
+  (let [updated-opts (if (nil? (:read-preference opts)) (assoc opts :read-preference (ReadPreference/primaryPreferred)) opts)]
+    (first (apply get-rs-members-by-state uri "PRIMARY" (mapcat identity updated-opts)))))
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
@@ -125,13 +127,14 @@
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
-  ([uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-   (count (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :members))))
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
+  (count (:members (apply run-replset-get-status uri (mapcat identity opts)))))
 
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-  (let [ result (run-replset-get-status uri :user user :pwd pwd :ssl ssl :read-preference (ReadPreference/primaryPreferred) :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) ]
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+  (let [ updated-opts (if (nil? (:read-preference opts)) (assoc opts :read-preference (ReadPreference/primaryPreferred)) opts)
+        result (apply run-replset-get-status uri (mapcat identity updated-opts)) ]
     ;;(println "num-active result for uri " uri " is " result)
     ;;(println "Active members is " (get result :members))
     (count (filter #(let [state (get % :stateStr)] (or (= state "PRIMARY") (= state "SECONDARY"))) (get result :members)))))
