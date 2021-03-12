@@ -59,8 +59,10 @@ Vagrant.configure("2") do |config|
       SSHD_CONFIG
       node.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh/ ] || mkdir /home/vagrant/.ssh", privileged: false
       node.vm.provision "shell", inline: "echo #{insecure_ssh_pub_key} >> /home/vagrant/.ssh/authorized_keys", privileged: false
-      node.vm.provision "shell", inline: "sudo sed -i 's/bindIp: 127.0.0.1/bindIpAll: true/' /etc/mongod.conf"
-      node.vm.provision 'shell', inline: "sudo sed -i 's/port: 27017/port: 27107/' /etc/mongod.conf"
+      node.vm.provision "file",  source: "mongod-service.conf", destination: "mongod-service.conf"
+      node.vm.provision "shell", inline: "sudo mv mongod-service.conf /etc/mongod.conf"
+#      node.vm.provision "shell", inline: "sudo sed -i 's/bindIp: 127.0.0.1/bindIpAll: true/' /etc/mongod.conf"
+#      node.vm.provision 'shell', inline: "sudo sed -i 's/port: 27017/port: 27107/' /etc/mongod.conf"
       node.vm.provision "shell", inline: 'sudo systemctl stop mongod && sudo systemctl disable mongod'
       node.vm.provider "virtualbox" do |vb|
         vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
