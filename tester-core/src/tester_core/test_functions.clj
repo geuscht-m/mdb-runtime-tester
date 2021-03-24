@@ -2,21 +2,20 @@
 
 (defn trigger-election
   "Trigger an election by issuing a stepdown command (optionally forced). Fails if URI doesn't point to a valid RS or stepdown fails"
-  [rs-uri & { :keys [forced user pwd ssl root-ca client-cert auth-mechanism] :or {forced false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  (stepdown-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism))
+  [rs-uri & { :keys [forced user pwd ssl root-ca client-cert auth-mechanism] :as opts}]
+  (apply stepdown-primary rs-uri (mapcat identity opts)))
 
 (defn simulate-maintenance
   "Simulate maintenance/rolling mongod bounce on a replica set. Fails if the RS URI doesn't point to a valid RS"
-  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
-  (let [conn        (md/mdb-connect rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [rs-uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
+  (let [conn        (apply md/mdb-connect rs-uri (mapcat identity opts))
         primary     (get (get-rs-primary conn) :name)
-        secondaries (doall (map #(get % :name) (get-rs-secondaries conn)))]
+        secondaries (doall (map #(get % :name) (get-rs-secondaries conn)))
+        primary-uri (make-mongo-uri primary)]
     (md/mdb-disconnect conn)
-    ;;(println "Primary is " primary ", secondaries are " secondaries)
-    (doall (map #(restart-mongo-process (make-mongo-uri %) :user user :pwd pwd :ssl ssl :root-ca root-ca) secondaries))
-    ;;(stepdown-primary rs-uri :user user :password pw)
-    (stepdown-primary (make-mongo-uri primary) :user user :pwd pwd :ssl ssl :root-ca root-ca)
-    (restart-mongo-process (make-mongo-uri primary) :user user :pwd pwd :ssl ssl :root-ca root-ca)))
+    (doall (map #(apply restart-mongo-process (make-mongo-uri %) (mapcat identity opts)) secondaries))
+    (apply stepdown-primary primary-uri (mapcat identity opts))
+    (apply restart-mongo-process primary-uri (mapcat identity opts))))
 
 (defn restart-random-rs-member
   "Restart a random member of the replica set (secondary or primary)"
@@ -27,12 +26,10 @@
 (defn- partial-stop-rs
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
-  [rs-uri member-num & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-  (let [ssl-enabled  (or ssl (.contains rs-uri "ssl=true"))
-        stop-members (doall (map #(make-mongo-uri (get % :name)) (get-random-members rs-uri member-num :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)))
-        restart-info (into () (doall (map #(stop-mongo-process % :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) stop-members)))]
+  [rs-uri member-num & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+  (let [stop-members (doall (map #(make-mongo-uri (get % :name)) (apply get-random-members rs-uri member-num (mapcat identity opts))))
+        restart-info (into () (doall (map #(apply stop-mongo-process % (mapcat identity opts)) stop-members)))]
     (timbre/debug "partial-stop-rs: restart info is " restart-info)
-    ;;(flush)
     (fn [] (do (timbre/debug "Attempting to execute restart function with info " restart-info)
                (if (seq? restart-info)
                  (doall (map (fn[info]

@@ -99,7 +99,7 @@
       (do (timbre/debug "Creating unauthenticated connection to uri " mongo-uri)
           (MongoClients/create settings))
       (let [cred (MongoCredential/createCredential user "admin" (char-array pwd))]
-           (println "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
+           (timbre/debug "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
            (MongoClients/create
             (-> (MongoClientSettings/builder)
                 (.applyConnectionString (ConnectionString. mongo-uri))                                          
@@ -196,7 +196,7 @@
   "Helper function for mdb-run-command. Mainly useful in case we have
    to try and re-run the command from the error handler in mdb-run-command"
   [db command readPreference]
-  ;;(println "Running command " command " on db " db " with readPreference " readPreference)
+  (timbre/trace "Executing command " command " on db " db " with readPreference " readPreference)
   (if (nil? readPreference)
                      (.runCommand db (pcv/to-bson-document command))
                      (.runCommand db (pcv/to-bson-document command) readPreference)))
@@ -205,7 +205,7 @@
   "Run a MongoDB command against the database <db-name> and return the result
    as a map"
   [^MongoClient conn ^String dbname command & { :keys [ readPreference ] :or { readPreference nil } }]
-  ;;(println "Running command " command " on connection " conn)
+  (timbre/trace "Running command " command " on connection " conn "with readPreference" readPreference)
   (let [db  (.getDatabase conn dbname)]
     (try
       (pcv/from-bson-document (mdb-exec-command db command readPreference) true)

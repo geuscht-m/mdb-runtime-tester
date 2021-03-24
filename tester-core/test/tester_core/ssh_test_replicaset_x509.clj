@@ -17,7 +17,7 @@
     (is (= 0 (num-running-mongo-processes servers)))
     (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-x509.conf" servers)
     (Thread/sleep 1500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&ssl=true" 3 17 :client-cert "../../../tls/user-cert.pem" :ssl true :root-ca "../../../tls/root.crt" :auth-mechanism :mongodb-x509)
+    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:29017,rs2.mongodb.test:29017,rs3.mongodb.test:29017/?replicaSet=replTestX509&connectTimeoutMS=1000&serverSelectionTimeoutMS=1000&ssl=true" 3 17 :client-cert "../../../tls/user-cert.pem" :ssl true :root-ca "../../../tls/root.crt" :auth-mechanism :mongodb-x509)
       (f)
       (timbre/error "Test replica set not ready in time"))
     (ssh-apply-command-to-rs-servers "pkill mongod" servers)    

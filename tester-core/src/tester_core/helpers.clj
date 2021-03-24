@@ -44,8 +44,8 @@
 
 (defn- run-listshards
   "Returns the output of the mongodb listShards admin command"
-  [uri & { :keys [ username password ssl root-ca client-cert auth-mechanism ] :or { username nil password nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
-  (let [conn       (md/mdb-connect uri :user username :pwd password :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [uri & { :keys [ username password ssl root-ca client-cert auth-mechanism ] :as opts } ]
+  (let [conn       (apply md/mdb-connect uri (mapcat identity opts))
         shard-list (md/mdb-admin-command conn { :listShards 1 })]
     (md/mdb-disconnect conn)
     shard-list))
@@ -64,17 +64,17 @@
 
 (defn- run-get-shard-map
   "Returns the output of MongoDB's getShardMap admin command"
-  [uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  (let [conn       (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :as opts}]
+  (let [conn       (apply md/mdb-connect uri (mapcat identity opts))
         shard-map  (md/mdb-admin-command conn { :getShardMap 1 })]
     (md/mdb-disconnect conn)
     shard-map))
 
 (defn- run-replset-stepdown
   "Runs replSetStepdown to force an election"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
   (timbre/debug "Attempting to step down primary at " uri " with user " user " and root-ca " root-ca)
-  (let [conn (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
+  (let [conn (apply md/mdb-connect uri (mapcat identity opts))]
     (try
       (md/mdb-admin-command conn { :replSetStepDown 120 })
       (catch com.mongodb.MongoSocketReadException e
@@ -121,9 +121,10 @@
 
 (defn get-rs-secondaries
   "Retrieve a list of secondaries for a given replica set. Fails if URI doesn't point to a valid replica set"
-  [uri & { :keys [ read-pref user pwd ssl root-ca client-cert auth-mechanism ] :or { read-pref (ReadPreference/primaryPreferred) user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  ;;(println "Getting secondary for rs " uri ", user " user ", root-ca " root-ca)
-  (get-rs-members-by-state uri "SECONDARY" :user user :pwd pwd :read-pref read-pref :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism))
+  [uri & { :keys [ read-preference user pwd ssl root-ca client-cert auth-mechanism ] :as opts}]
+  (timbre/debug "Getting list of secondary for replicaset " uri ", user " user ", root-ca " root-ca)
+  (let [updated-opts (if (nil? (:read-preference opts)) (assoc opts :read-preference (ReadPreference/primaryPreferred)) opts)]
+    (apply get-rs-members-by-state uri "SECONDARY" (mapcat identity opts))))
 
 (defn get-num-rs-members
   "Retrieve the number of members in a replica set referenced by its uri"
@@ -133,10 +134,8 @@
 (defn num-active-rs-members
   "Return the number of 'active' replica set members that are either in PRIMARY or SECONDARY state"
   [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
-  (let [ updated-opts (if (nil? (:read-preference opts)) (assoc opts :read-preference (ReadPreference/primaryPreferred)) opts)
+  (let [updated-opts (if (nil? (:read-preference opts)) (assoc opts :read-preference (ReadPreference/primaryPreferred)) opts)
         result (apply run-replset-get-status uri (mapcat identity updated-opts)) ]
-    ;;(println "num-active result for uri " uri " is " result)
-    ;;(println "Active members is " (get result :members))
     (count (filter #(let [state (get % :stateStr)] (or (= state "PRIMARY") (= state "SECONDARY"))) (get result :members)))))
 
 (defn is-local-process?
@@ -149,27 +148,24 @@
 
 (defn check-process-type
   "Retrieve the process type from serverstatus"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} }]
-  (timbre/debug "Trying to get process type for uri " uri " with user " user " and root-ca " root-ca)
-  (timbre/debug "Type of URI parameter is " (type uri))
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
+  (timbre/debug "Trying to get process type for uri " uri "of type" (type uri) " with user " user ", root-ca " root-ca "and auth mechanism" auth-mechanism)
   (if (= (type uri) String)
-      (let [ssl-enabled (or ssl (.contains uri "ssl=true"))]
-      ;;(get-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca)
-        (get (run-server-status uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :process))
-      (first uri)))
+    (:process (apply run-server-status uri (mapcat identity opts)))
+    (first uri)))
 
 (defn is-mongod-process?
   "Check if the process referenced by the startup is a mongod process"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
   (timbre/debug "Checking if process at " uri " is a mongod or mongos process")
   (if (or (vector? uri) (is-mongodb-uri? uri))
-    (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) "mongod")
+    (= (apply check-process-type uri (mapcat identity opts)) "mongod")
     (or (= (first uri) "mongod") (and (str/includes? uri "systemctl") (str/includes? uri "mongod")))))
 
 (defn is-mongos-process?
   "Check if the process referenced by the parameters seq is a mongos process"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
-  (= (check-process-type uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) "mongos"))
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
+  (= (apply check-process-type uri (mapcat identity opts)) "mongos"))
 
 (defn start-local-mongo-process [uri process-settings]
   (timbre/debug "Starting local mongo process on uri " uri " with parameters " process-settings)
@@ -197,10 +193,9 @@
   "Behind the scenes implementation of mongo process shutdown.
    This is the shutdown via the MongoDB admin command. For
    externally triggered process shutdown, see the next function."
-  [uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil} } ]
+  [uri & { :keys [force ^String user ^String pwd ssl root-ca client-cert auth-mechanism] :as opts } ]
   (timbre/debug "Stopping mongo process at uri " uri " with username " user)
-  (let [ssl-enabled   (or ssl (.contains uri "ssl=true"))
-        conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl-enabled :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  (let [conn          (apply md/mdb-connect uri (mapcat identity opts))
         server-status (run-server-status conn)
         cmdline       (run-server-get-cmd-line-opts conn)
         hostname      (extract-server-name uri)
@@ -214,8 +209,8 @@
 (defn kill-mongo-process-impl
   "Implementation of kill-mongo-process that distinguishes between a local and remote process, and
    calls the appropriate function to stop the mongo process."
-  [uri & { :keys [force user pwd ssl root-ca client-cert auth-mechanism] :or { force false user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil }}]
-  (let [conn          (md/mdb-connect uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)
+  [uri & { :keys [force user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
+  (let [conn          (apply md/mdb-connect uri (mapcat identity opts))
         cmd-line      (run-server-get-cmd-line-opts conn)
         server-status (run-server-status conn)
         pid           (get server-status :pid)
@@ -228,23 +223,21 @@
     
 (defn get-random-members
   "Returns a list of n random replica set members from the replica set referenced by uri"
-  [uri n & {:keys [^String user ^String pwd ssl root-ca client-cert auth-mechanism] :or {user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  ;;(println "\nGetting random members for replset " uri "\n")
-  (let [rs-members (get (run-replset-get-status uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :members)]
-    ;;(println "\nWorking on member list " rs-members "\n")
+  [uri n & {:keys [^String user ^String pwd ssl root-ca client-cert auth-mechanism] :as opts}]
+  (let [rs-members (:members (apply run-replset-get-status uri (mapcat identity opts)))]
     (take n (shuffle rs-members))))
 
 
 (defn get-random-shards
   "Returns a list of n random shards from the sharded cluster referenced by the uri"
-  [uri n & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :or {user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  (let [shards (get (run-listshards uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism) :shards)]
+  [uri n & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :as opts}]
+  (let [shards (:shards (apply run-listshards uri (mapcat identity opts)))]
     (take n (shuffle shards))))
 
 (defn get-config-servers-uri
   "Given a sharded cluster, returns the URI needed to connect to the config servers"
-  [cluster-uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :or {user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
-  (let [shard-map (run-get-shard-map cluster-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
+  [cluster-uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :as opts}]
+  (let [shard-map (apply run-get-shard-map cluster-uri (mapcat identity opts))]
     ;;(println shard-map)
     (str/split (get (get shard-map :map) :config) #",")))
 
@@ -258,9 +251,9 @@
    cluster-uri _must_ point to the mongos for correct discovery.
    Note that listShards returns the shard replsets in a different format
    so we have to transform them before returning the list"
-  [cluster-uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil}}]
+  [cluster-uri & {:keys [user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
   ;;(println "\nTrying to get shard uris for cluster " cluster-uri "\n")
-  (let [shard-configs (run-listshards cluster-uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)]
+  (let [shard-configs (apply run-listshards cluster-uri (mapcat identity opts))]
     (map #(convert-shard-uri (get % :host)) (get shard-configs :shards))))
 
 
@@ -271,9 +264,9 @@
 
 (defn is-sharded-cluster?
   "Check if the cluster specified by the URI is a sharded cluster or a replica set"
-  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :or { user nil pwd nil ssl false root-ca nil client-cert nil auth-mechanism nil } }]
+  [uri & { :keys [ user pwd ssl root-ca client-cert auth-mechanism] :as opts }]
   (try
-    (let [shard-uris (get-shard-uris uri :user user :pwd pwd :ssl ssl :root-ca root-ca :client-cert client-cert :auth-mechanism auth-mechanism)] 
+    (let [shard-uris (apply get-shard-uris uri (mapcat identity opts))] 
       (not (empty? shard-uris)))
     (catch com.mongodb.MongoCommandException e
       ;; Note - add log output just in case
