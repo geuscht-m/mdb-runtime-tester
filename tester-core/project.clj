@@ -7,7 +7,7 @@
             ;;[lein-git-deps "0.0.1-SNAPSHOT"]
             [lein-eftest "0.5.9"]]
   :dependencies [[org.clojure/clojure             "1.10.0"]
-                 [org.mongodb/mongodb-driver-sync "4.2.0"]
+                 [org.mongodb/mongodb-driver-sync "4.2.2"]
                  [clojurewerkz/urly               "1.0.0"]
                  [com.taoensso/timbre             "5.1.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre       "0.3.14"] ;; Attempt to send all log output through timbre
@@ -18,7 +18,7 @@
                  [clj-pem-decoder                 "0.1.0-SNAPSHOT"]]
   ;;:git-dependencies [["https://github.com/geuscht-m/clj-pem-decoder.git"]]
   ;;:local-repo "../local-m2"
-  :eftest { :multithread? false :test-warn-time 20000 }
+  :eftest { :multithread? false :test-warn-time 60000 }
   ;;:main tester-core.core
   :target-path "target/%s"
   ;;:profiles {:uberjar {:aot :all}})
