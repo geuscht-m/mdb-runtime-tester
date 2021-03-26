@@ -1,7 +1,8 @@
 (ns tester-core.mini-driver
   (:require [tester-core.conv-helpers :as pcv]
             [clojure.string           :as str]
-            [clj-pem-decoder.core     :as pem :refer :all]))
+            [clj-pem-decoder.core     :as pem :refer :all]
+            [taoensso.timbre :as timbre :refer [debug]]))
 (import [com.mongodb.client MongoClients MongoClient MongoDatabase MongoCollection FindIterable]
         [com.mongodb ConnectionString ReadPreference MongoCredential MongoClientSettings Block MongoCommandException]
         [com.mongodb.connection SslSettings]
@@ -91,21 +92,24 @@
                                                  (.build)))))
        (.build))))
 
-(defn- create-ssl-mongo-client-scram-no-ssl-context
+(defn- ^MongoClient create-ssl-mongo-client-scram-no-ssl-context
   [mongo-uri ssl user pwd]
-  (let [settings (ConnectionString. mongo-uri)
-        cred     (MongoCredential/createCredential user "admin" (char-array pwd))]
-    ;;(println "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
-    (MongoClients/create
-     (-> (MongoClientSettings/builder)
-         (.applyConnectionString (ConnectionString. mongo-uri))                                          
-         (.applyToSslSettings(reify
-                               com.mongodb.Block
-                               (apply [this s] (-> s
-                                                   (.enabled ssl)
-                                                   (.build)))))
-         (.credential cred)
-         (.build)))))
+  (let [settings (ConnectionString. mongo-uri)]
+    (if (nil? user)
+      (do (timbre/debug "Creating unauthenticated connection to uri " mongo-uri)
+          (MongoClients/create settings))
+      (let [cred (MongoCredential/createCredential user "admin" (char-array pwd))]
+           (timbre/debug "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
+           (MongoClients/create
+            (-> (MongoClientSettings/builder)
+                (.applyConnectionString (ConnectionString. mongo-uri))                                          
+                (.applyToSslSettings(reify
+                                      com.mongodb.Block
+                                      (apply [this s] (-> s
+                                                          (.enabled ssl)
+                                                          (.build)))))
+                (.credential cred)
+                (.build)))))))
 
 (defn- create-ssl-mongo-client-scram-with-ssl-context
   [mongo-uri ssl user pwd root-ca]
@@ -168,17 +172,11 @@
   ;; Check if the user sent an authentication method or not.
   ;; If they didn't, default to SCRAM-SHA (username / password), otherwise connect using
   ;; the appropriate method
-  ;;(println "Attempting to connect to " mongo-uri)
-  ;;(println "Trying to connect to " mongo-uri " with user " user ", password", pwd ", ssl " ssl " and root-ca " root-ca)
+  (timbre/debug "Trying to connect to " mongo-uri " with user " user ", ssl " ssl ", root-ca " root-ca ", client-cert " client-cert ", auth-mechanism " auth-mechanism)
   (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
-    ;; Connect either without user information, or all of the authentication information
-    ;; encoded in the URI connection string
-    (let [ssl-enabled (or ssl (.contains mongo-uri "ssl=true"))]
-      (cond (nil? user) (if ssl-enabled
-                          (create-client-with-ssl mongo-uri ssl-enabled root-ca)
-                          (MongoClients/create (ConnectionString. mongo-uri)))
-            (and (not (nil? user))
-                 (not (nil? pwd))) (create-scram-client-with-ssl mongo-uri user pwd ssl-enabled root-ca)))
+    (if (nil? root-ca)
+      (create-ssl-mongo-client-scram-no-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd)
+      (create-ssl-mongo-client-scram-with-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd root-ca))
     (cond (and (= auth-mechanism :mongodb-x509) (nil? user))
           (create-x509-client-with-ssl-and-client-cert mongo-uri root-ca client-cert)
           (and (= auth-mechanism :mongodb-x509)
@@ -187,7 +185,7 @@
                                         (.applyConnectionString (ConnectionString. mongo-uri))
                                         (.credential (MongoCredential/createMongoX509Credential user))
                                         (.build)))
-          false (println "Unsupported authentication method " auth-mechanism))))
+          false (timbre/error "Unsupported authentication method " auth-mechanism))))
 
 (defn mdb-disconnect
   "Close an existing connection to a MongoDB cluster"
@@ -198,7 +196,7 @@
   "Helper function for mdb-run-command. Mainly useful in case we have
    to try and re-run the command from the error handler in mdb-run-command"
   [db command readPreference]
-  ;;(println "Running command " command " on db " db " with readPreference " readPreference)
+  (timbre/trace "Executing command " command " on db " db " with readPreference " readPreference)
   (if (nil? readPreference)
                      (.runCommand db (pcv/to-bson-document command))
                      (.runCommand db (pcv/to-bson-document command) readPreference)))
@@ -207,7 +205,7 @@
   "Run a MongoDB command against the database <db-name> and return the result
    as a map"
   [^MongoClient conn ^String dbname command & { :keys [ readPreference ] :or { readPreference nil } }]
-  ;;(println "Running command " command " on connection " conn)
+  (timbre/trace "Running command " command " on connection " conn "with readPreference" readPreference)
   (let [db  (.getDatabase conn dbname)]
     (try
       (pcv/from-bson-document (mdb-exec-command db command readPreference) true)
@@ -222,7 +220,7 @@
              ;; (let [converted (pcv/from-bson-document result true)]
              ;;   (println "Converted result is " converted)
              ;;   converted)))
-          (do ;;(println "Received MongoCommandException " e)
+          (do (timbre/warn "Received MongoCommandException " e)
               (throw e)))))))
 
 (defn mdb-admin-command

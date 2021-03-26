@@ -18,7 +18,7 @@
     ;; Start mongod server processes
     (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-ssl.conf" servers)
     (Thread/sleep 1500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&ssl=true" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
+    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&serverSelectionTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
       (f)
       (timbre/error "Test replica set not ready in time"))
     ;; Stop mongod servers
