@@ -1,1 +1,1 @@
-../ssh-test-setup/config-timeouts.js
+../tester-core/config-timeouts.js
