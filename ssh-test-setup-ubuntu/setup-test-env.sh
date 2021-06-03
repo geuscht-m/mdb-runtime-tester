@@ -1,1 +1,1 @@
-../ssh-test-setup/setup-test-env.sh
+../tester-core/set-up-test-env.sh
