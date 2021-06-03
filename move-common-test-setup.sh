@@ -61,3 +61,19 @@ ln -s ../ssh-test-setup-common/mongod-ssh-x509-noauth.conf mongod-ssh-x509-noaut
 ln -s ../ssh-test-setup-common/mongod-ssh-x509.conf mongod-ssh-x509.conf
 ln -s ../ssh-test-setup-common/start-mongod-replset-node.sh start-mongod-replset-node.sh
 ln -s ../ssh-test-setup-common/test-keyfile test-keyfile
+
+cd ..
+
+git add ssh-test-setup/common-functions.rb
+git add ssh-test-setup/create-test-user-x509.js
+git add ssh-test-setup/create-test-user.js
+git add ssh-test-setup/init-replicaset-ssl.js
+git add ssh-test-setup/init-replicaset-x509.js
+git add ssh-test-setup/init-replicaset.js
+git add ssh-test-setup/mongod-service.conf
+git add ssh-test-setup/mongod-ssh-rs.conf
+git add ssh-test-setup/mongod-ssh-ssl.conf
+git add ssh-test-setup/mongod-ssh-x509-noauth.conf
+git add ssh-test-setup/mongod-ssh-x509.conf
+git add ssh-test-setup/start-mongod-replset-node.sh
+git add ssh-test-setup/test-keyfile
