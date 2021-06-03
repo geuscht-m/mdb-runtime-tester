@@ -1,1 +1,1 @@
-db.getSiblingDB('admin').createUser({ user: "admin", pwd: "pw99", roles: [ "root" ] });
+../ssh-test-setup-common/create-test-user.js

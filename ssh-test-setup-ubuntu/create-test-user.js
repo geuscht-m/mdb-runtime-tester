@@ -1,1 +1,1 @@
-../ssh-test-setup/create-test-user.js
+../ssh-test-setup-common/create-test-user.js

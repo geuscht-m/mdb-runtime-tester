@@ -1,1 +1,1 @@
-../ssh-test-setup/init-replicaset-ssl.js
+../ssh-test-setup-common/init-replicaset-ssl.js

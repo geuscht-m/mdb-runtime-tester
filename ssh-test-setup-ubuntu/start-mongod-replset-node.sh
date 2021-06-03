@@ -1,1 +1,1 @@
-../ssh-test-setup/start-mongod-replset-node.sh
+../ssh-test-setup-common/start-mongod-replset-node.sh

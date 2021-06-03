@@ -1,1 +1,1 @@
-../ssh-test-setup/create-test-user-x509.js
+../ssh-test-setup-common/create-test-user-x509.js

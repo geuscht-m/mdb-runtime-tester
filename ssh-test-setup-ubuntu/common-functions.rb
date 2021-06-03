@@ -1,1 +1,1 @@
-../ssh-test-setup/common-functions.rb
+../ssh-test-setup-common/common-functions.rb

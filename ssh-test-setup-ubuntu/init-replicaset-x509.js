@@ -1,1 +1,1 @@
-../ssh-test-setup/init-replicaset-x509.js
+../ssh-test-setup-common/init-replicaset-x509.js
