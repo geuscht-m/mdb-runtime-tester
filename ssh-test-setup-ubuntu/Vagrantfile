@@ -1,5 +1,5 @@
 require          'fileutils'
-require_relative 'common_functions'
+require_relative 'common-functions'
 
 num_test_servers = 3
 
