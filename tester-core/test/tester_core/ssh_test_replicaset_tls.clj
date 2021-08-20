@@ -9,21 +9,24 @@
             [tester-core.core :refer :all]
             [tester-core.test-helpers :refer :all]
             [tester-core.mini-driver :as md :refer :all]
-            [taoensso.timbre :as timbre :refer [merge-config! debug error]]))
+            [taoensso.timbre :as timbre :refer [debug error]]))
 
 (defn- ssh-test-fixture
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
-    (is (= 0 (num-running-mongo-processes servers)))
-    ;; Start mongod server processes
-    (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-ssl.conf" servers)
-    (Thread/sleep 1500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&serverSelectionTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
-      (f)
-      (timbre/error "Test replica set not ready in time"))
-    ;; Stop mongod servers
-    (ssh-apply-command-to-rs-servers "pkill mongod" servers)
-    (wait-mongo-shutdown servers 20)))
+    (if (= 0 (num-running-mongo-processes servers))
+      (do
+        ;; Start mongod server processes
+        (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-ssl.conf" servers)
+        (Thread/sleep 1500)
+        (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:28017,rs2.mongodb.test:28017,rs3.mongodb.test:28017/?replicaSet=replTestTLS&connectTimeoutMS=1000&serverSelectionTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99" :ssl true :root-ca "../../../tls/root.crt")
+          (f)
+          (timbre/error "SSH Test Replicaset w/ SSL - Test replica set not ready in time"))
+        ;; Stop mongod servers
+        (ssh-apply-command-to-rs-servers "pkill mongod" servers)
+        (wait-mongo-shutdown servers 20)
+        (is (= 0 (num-running-mongo-processes servers))))
+      (timbre/error "Inconsistent state - mongo processing running on test servers that shouldn't"))))
 
 (use-fixtures :each ssh-test-fixture)
 (use-fixtures :once setup-logging-fixture)
@@ -81,6 +84,7 @@
           original-primary (get (get-rs-primary rs-uri :user user :pwd pw :root-ca root-ca) :name)]
       (trigger-election rs-uri :user user :pwd pw :root-ca root-ca)
       (Thread/sleep 11000)
+      (is (= 3 (num-running-mongo-processes ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"])))
       (is (not (= (get (get-rs-primary rs-uri :user user :pwd pw :root-ca root-ca) :name) original-primary))))))
 
 

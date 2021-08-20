@@ -17,7 +17,7 @@
   "Execute a command described by cmdline on the remote server 'server'"
   [server cmdline]
   (timbre/debug "Attempting to run ssh command " cmdline " on server " server)
-  (timbre/debug "run-remote-ssh-command: type of cmdline is " (type cmdline))
+  ;;(timbre/debug "run-remote-ssh-command: type of cmdline is " (type cmdline))
   (let [agent   (ssh/ssh-agent {})
         session (ssh/session agent server {:strict-host-key-checking :no})]
     (ssh/with-connection session

@@ -165,6 +165,10 @@
   [^String uri]
   (.create MongoClients uri))
 
+(defn has-tls-in-uri
+  [rs-uri]
+  (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true")))
+
 (defn ^MongoClient mdb-connect
   "Connect to a MongoDB database cluster using a URI and an optional
    authentication method"
@@ -175,8 +179,8 @@
   (timbre/debug "Trying to connect to " mongo-uri " with user " user ", ssl " ssl ", root-ca " root-ca ", client-cert " client-cert ", auth-mechanism " auth-mechanism)
   (if (or (nil? auth-mechanism) (str/starts-with? auth-mechanism "SCRAM-SHA"))
     (if (nil? root-ca)
-      (create-ssl-mongo-client-scram-no-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd)
-      (create-ssl-mongo-client-scram-with-ssl-context mongo-uri (or ssl (.contains mongo-uri "ssl=true")) user pwd root-ca))
+      (create-ssl-mongo-client-scram-no-ssl-context mongo-uri (or ssl (has-tls-in-uri mongo-uri)) user pwd)
+      (create-ssl-mongo-client-scram-with-ssl-context mongo-uri (or ssl (has-tls-in-uri mongo-uri)) user pwd root-ca))
     (cond (and (= auth-mechanism :mongodb-x509) (nil? user))
           (create-x509-client-with-ssl-and-client-cert mongo-uri root-ca client-cert)
           (and (= auth-mechanism :mongodb-x509)
