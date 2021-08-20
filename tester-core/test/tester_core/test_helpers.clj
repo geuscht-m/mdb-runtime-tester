@@ -44,7 +44,7 @@
   ([max-retries]
    (let [retries (atom 0)]
      (while (and (> (num-running-mongo-processes) 0) (< @retries max-retries))
-       (Thread/sleep 500)
+       (Thread/sleep 750)
        (reset! retries (inc @retries)))
      (if (>= @retries max-retries)
        (timbre/warn "Unable to shut down remaining mongo processes, aborting"))))
@@ -85,14 +85,14 @@
 (defn replicaset-ready?
   "Check if the replica set at URI is ready (has a primary and the requisite number of total active nodes"
   [rs-uri num-nodes & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts}]
-  (let [conn       (apply md/mdb-connect rs-uri (mapcat identity opts))
-        num-active (apply num-active-rs-members conn (mapcat identity opts))
-        primary    (apply get-rs-primary conn (mapcat identity opts))]
-    (md/mdb-disconnect conn)
-    (and (= num-active num-nodes)
-         (some? primary))))
-  ;; (and (= (num-active-rs-members rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca) num-nodes)
-  ;;      (some? (get-rs-primary rs-uri :user user :pwd pwd :ssl ssl :root-ca root-ca))))
+  (try
+    (let [conn       (apply md/mdb-connect rs-uri (mapcat identity opts))
+          num-active (apply num-active-rs-members conn (mapcat identity opts))
+          primary    (apply get-rs-primary conn (mapcat identity opts))]
+      (md/mdb-disconnect conn)
+      (and (= num-active num-nodes)
+           (some? primary)))
+    (catch com.mongodb.MongoTimeoutException e false)))
 
 (defn wait-test-rs-ready
   "Waits until the replica set is ready for testing so we don't
