@@ -1,6 +1,7 @@
 require          'fileutils'
 require_relative 'common-functions'
 
+mongodb_version = "5.0"
 num_test_servers = 3
 
 Vagrant.configure("2") do |config|
@@ -52,8 +53,8 @@ Vagrant.configure("2") do |config|
         end
       end
       if ARGV[0] == 'up'
-        node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -"
-        node.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
+        node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-#{mongodb_version}.asc | sudo apt-key add -"
+        node.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/#{mongodb_version} multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
         node.vm.provision "shell", inline: <<-SSHD_CONFIG
           sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
           systemctl restart sshd.service
@@ -93,8 +94,8 @@ Vagrant.configure("2") do |config|
       end
     end
     if ARGV[0] == 'up'
-      tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -"
-      tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/4.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
+      tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-#{mongodb_version}.asc | sudo apt-key add -"
+      tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/#{mongodb_version} multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
     end
     if ARGV[0] == "up" || ARGV[0] == 'provision'
       tester.vm.provision "shell", inline: "sudo apt-get update && sudo apt-get upgrade -y"
