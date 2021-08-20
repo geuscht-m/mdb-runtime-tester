@@ -7,7 +7,7 @@
             ;;[lein-git-deps "0.0.1-SNAPSHOT"]
             [lein-eftest "0.5.9"]]
   :dependencies [[org.clojure/clojure             "1.10.0"]
-                 [org.mongodb/mongodb-driver-sync "4.2.2"]
+                 [org.mongodb/mongodb-driver-sync "4.3.1"]
                  [clojurewerkz/urly               "1.0.0"]
                  [com.taoensso/timbre             "5.1.0"] ;; Mainly used to get a chance to deal with the chatty Java driver
                  [com.fzakaria/slf4j-timbre       "0.3.14"] ;; Attempt to send all log output through timbre
