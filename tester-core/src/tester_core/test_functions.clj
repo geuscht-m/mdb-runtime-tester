@@ -11,8 +11,9 @@
   (let [conn        (apply md/mdb-connect rs-uri (mapcat identity opts))
         primary     (get (get-rs-primary conn) :name)
         secondaries (doall (map #(get % :name) (get-rs-secondaries conn)))
-        has-ssl     (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") :ssl)
+        has-ssl     (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") ssl)
         primary-uri (str/join "" [ (make-mongo-uri primary) (if has-ssl "/&tls=true" "/&tls=false")])]
+    (timbre/debug "Trying to simulate maintenance on RS " rs-uri " with primary " primary-uri " and has-ssl " has-ssl)
     (md/mdb-disconnect conn)
     (doall (map #(apply restart-mongo-process (str/join "" [(make-mongo-uri %) (if has-ssl "/&tls=true" "/&tls=false")]) (mapcat identity opts)) secondaries))
     (apply stepdown-primary primary-uri (mapcat identity opts))
@@ -28,7 +29,7 @@
   "Internal helper function to stop _member-num_ members of a replica set.
    Note - returns the 'undo' method needed to start the members again."
   [rs-uri member-num & { :keys [ user pwd ssl root-ca client-cert auth-mechanism ] :as opts }]
-  (let [has-ssl      (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") :ssl)
+  (let [has-ssl      (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") ssl)
         stop-members (doall (map #(str/join "" [(make-mongo-uri (get % :name)) (if has-ssl "/&tls=true" "/&tls=false")]) (apply get-random-members rs-uri member-num (mapcat identity opts))))
         restart-info (into () (doall (map #(apply stop-mongo-process % (mapcat identity opts)) stop-members)))]
     (timbre/debug "partial-stop-rs: restart info is " restart-info)

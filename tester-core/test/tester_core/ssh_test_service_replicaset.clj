@@ -12,7 +12,7 @@
     (Thread/sleep 1500)
     (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27107,rs2.mongodb.test:27107,rs3.mongodb.test:27107/?replicaSet=replTestService&connectTimeoutMS=1000&serverSelectionTimeoutMS=1000" 3 17)
       (f)
-      (timbre/error "Test replica set not ready in time"))
+      (timbre/error "SSH server test - Test replica set not ready in time"))
     (ssh-apply-command-to-rs-servers "sudo systemctl stop mongod" servers)
     (wait-mongo-shutdown servers 20)))
 

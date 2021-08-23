@@ -47,7 +47,7 @@
   "Stepdown the primary for a replica set referenced by uri. Will error out if the URI doesn't point to a replica set or the RS has no primary"
   [rs-uri & { :keys [user pwd ssl root-ca client-cert auth-mechanism] :as opts}]
   (let [primary (:name (apply get-rs-primary rs-uri (mapcat identity opts)))
-        has-ssl (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") :ssl)
+        has-ssl (or (.contains rs-uri "ssl=true") (.contains rs-uri "tls=true") ssl)
         primary-uri (str/join "" [(make-mongo-uri primary) (if has-ssl "/&tls=true" "/&tls=false")])]
     (timbre/debug "Trying to step down primary " primary " with uri " primary-uri " on replica set " rs-uri ", root-ca " root-ca)
     (apply run-replset-stepdown primary-uri (mapcat identity opts))))

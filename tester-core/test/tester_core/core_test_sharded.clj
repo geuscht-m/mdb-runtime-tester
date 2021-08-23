@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [tester-core.core :refer :all]
             [tester-core.test-helpers :refer :all]
+            [taoensso.timbre :as timbre :refer [trace warn debug error]]
             [clojure.java.shell :refer [sh]]))
 
 (defn- control-sharded-cluster
@@ -19,25 +20,25 @@
         shard-2 "mongodb://localhost:27021,localhost:27022,localhost:27023/?replicaSet=shard02"
         shard-3 "mongodb://localhost:27024,localhost:27025,localhost:27026/?replicaSet=shard03"
         retries (atom 0)]
-    (Thread/sleep 1100)
     (while (and (not (and (replicaset-ready? shard-1 3) (replicaset-ready? shard-2 3) (replicaset-ready? shard-3 3))) (< @retries 19))
       (reset! retries (inc @retries))
       (Thread/sleep 500))
-    ;;(println "Test cluster ready, took " @retries " retries")
     (< @retries 19)))
 
 (defn wrap-sharded-tests
   "Intialisation wrapper for test runner, executed for every test.
    Tries to provide sane environment"
   [f]
-  (is (= 0 (num-running-mongo-processes)))
-  (control-sharded-cluster "start")
-  (Thread/sleep 500)
-  (if (wait-test-cluster-ready)
-    (do (is (= 13 (num-running-mongo-processes))) (f))
-    (println "Test sharded cluster readiness timed out"))
-  (control-sharded-cluster "stop")
-  (wait-mongo-shutdown 40))
+  (if (= 0 (num-running-mongo-processes))
+    (do
+      (control-sharded-cluster "start")
+      (Thread/sleep 1500)
+      (if (wait-test-cluster-ready)
+        (do (is (= 13 (num-running-mongo-processes))) (f))
+        (timbre/error "Test sharded cluster readiness timed out"))
+      (control-sharded-cluster "stop")
+      (wait-mongo-shutdown 40))
+    (timbre/error "Inconsistent state - there are mongo processes running that shouldn't be before sharded cluster startup")))
 
 (use-fixtures :each wrap-sharded-tests)
 (use-fixtures :once setup-logging-fixture)

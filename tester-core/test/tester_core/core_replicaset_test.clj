@@ -4,6 +4,7 @@
             [tester-core.sys-helpers :refer :all]
             [tester-core.test-helpers :refer :all]
             [tester-core.mini-driver :as md :refer :all]
+            [taoensso.timbre :as timbre :refer [trace warn debug error]]
             [clojure.java.shell :refer [sh]]))
 
 (defn- control-test-rs
@@ -16,15 +17,18 @@
   "Intialisation wrapper for test runner, executed for every test.
    Tries to provide sane environment"
   [f]
-  (is (= 0 (num-running-mongo-processes)))
-  (control-test-rs "start")
-  (Thread/sleep 1500)
-  (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 19)
-    (f)
-    (println "Test replica set not ready in time"))
-  (control-test-rs "stop")
-  (wait-mongo-shutdown 20)
-  (is (= 0 (num-running-mongo-processes))))
+  (if (= 0 (num-running-mongo-processes))
+    (do
+      (control-test-rs "start")
+      (Thread/sleep 1500)
+      (if (wait-test-rs-ready "mongodb://localhost:27017,localhost:27018,localhost:27019,localhost:27020,localhost:27021/?replicaSet=replset&connectTimeoutMS=1000" 5 19)
+        (f)
+        (timbre/error "Test replica set not ready in time"))
+      (control-test-rs "stop")
+      (wait-mongo-shutdown 20)
+      (is (= 0 (num-running-mongo-processes))))
+    (timbre/error "Inconsistent state - looks like there are MongoDB processes running that shouldn't")))
+      
 
 (use-fixtures :each wrap-rs-tests)
 (use-fixtures :once setup-logging-fixture)

@@ -99,7 +99,7 @@
       (do (timbre/debug "Creating unauthenticated connection to uri " mongo-uri)
           (MongoClients/create settings))
       (let [cred (MongoCredential/createCredential user "admin" (char-array pwd))]
-           (timbre/debug "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context")
+           (timbre/debug "Creating SCRAM connection to " mongo-uri " for user " user " with default SSL context, SSL enabled is " ssl)
            (MongoClients/create
             (-> (MongoClientSettings/builder)
                 (.applyConnectionString (ConnectionString. mongo-uri))                                          

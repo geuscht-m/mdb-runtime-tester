@@ -14,14 +14,16 @@
 (defn- ssh-test-fixture
   [f]
   (let [servers ["rs1.mongodb.test" "rs2.mongodb.test" "rs3.mongodb.test"]]
-    (is (= 0 (num-running-mongo-processes servers)))
-    (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-rs.conf" servers)
-    (Thread/sleep 1500)
-    (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99")
-      (f)
-      (timbre/error "Test replica set not ready in time"))
-    (ssh-apply-command-to-rs-servers "pkill mongod" servers)
-    (wait-mongo-shutdown servers 20)))
+    (if (= 0 (num-running-mongo-processes servers))
+      (do
+        (ssh-apply-command-to-rs-servers "mongod -f mongod-ssh-rs.conf" servers)
+        (Thread/sleep 1500)
+        (if (wait-test-rs-ready "mongodb://rs1.mongodb.test:27017,rs2.mongodb.test:27017,rs3.mongodb.test:27017/?replicaSet=replTest&connectTimeoutMS=1000" 3 17 :user "admin" :pwd "pw99")
+          (f)
+          (timbre/error "Test replica set not ready in time"))
+        (ssh-apply-command-to-rs-servers "pkill mongod" servers)
+        (wait-mongo-shutdown servers 20))
+      (timbre/error "SSH replicaset test - inconsistent initial state, there are mongo processes running that shouldn't be"))))
 
 (use-fixtures :each ssh-test-fixture)
 (use-fixtures :once setup-logging-fixture)
