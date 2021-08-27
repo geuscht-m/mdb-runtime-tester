@@ -1,7 +1,7 @@
-ssh-test-setup/.vagrant
+ssh-test-setup-centos7/.vagrant
 ssh-test-setup-ubuntu/.vagrant
-ssh-test-setup/tls
-ssh-test-setup/ssh
+ssh-test-setup-centos7/tls
+ssh-test-setup-centos7/ssh
 ssh-test-setup-ubuntu/ssh
 ssh-test-setup-ubuntu/tls
 *~
