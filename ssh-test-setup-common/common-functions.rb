@@ -51,39 +51,43 @@ module CommonSetupFunctions
     #File.delete('client_auth.cnf')
   end
 
-  def self.cleanUpCerts
-    system('rm tls/user-cert/*')
-    system('rm tls/CA/*')
-    system('rm tls/testdriver/*')
-    system('rm tls/rs?/*')
+  def self.cleanUpCerts(max_rs)
+    FileUtils.rm_rf('tls/user-cert/')
+    FileUtils.rm_rf('tls/CA/')
+    FileUtils.rm_rf('tls/testdriver/')
+    (1..max_rs).each do |i|
+      FileUtils.rm_rf("tls/rs#{i}/")
+    end
+    FileUtils.rm_rf('tls/user-cert')
   end
 
 
   def self.setupTLSCerts(operation, num_test_servers)
     if operation == 'up' || operation == 'provision'
-      createBaseDirs(num_test_servers)
-      # Generate root certificate
-      system('openssl req -x509 -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/CA/root.key -sha256 -days 365 -out tls/CA/root.crt -subj "/C=US/ST=NY/L=NYC/O=TEST/CN=auth.mongodb.test"')
-      # Generate certificates for the replica set members
-      (1..num_test_servers).each do |i|
-        createTestServerCert(i)
+      if not File.directory?('tls/CA')
+        createBaseDirs(num_test_servers)
+        # Generate root certificate
+        system('openssl req -x509 -config /etc/ssl/openssl.cnf -new -nodes -keyout tls/CA/root.key -sha256 -days 365 -out tls/CA/root.crt -subj "/C=US/ST=NY/L=NYC/O=TEST/CN=auth.mongodb.test"')
+        # Generate certificates for the replica set members
+        (1..num_test_servers).each do |i|
+          createTestServerCert(i)
+        end
+        createTestDriverCert
+        createUserAuthCert
       end
-      createTestDriverCert
-      createUserAuthCert
     elsif operation == 'destroy'
-      cleanUpCerts
+      cleanUpCerts num_test_servers
     end
   end
 
   def self.setupSSHKeys(operation)
     insecure_ssh_pub_key = ''
     if operation == 'up' || operation == 'provision'
-      if File.directory?("ssh")
-        FileUtils.rm_rf('ssh')
+      if not File.directory?("ssh")
+        Dir.mkdir('ssh')
+        system('ssh-keygen -t ed25519 -f ssh/id_ed25519 -N ""')
+        insecure_ssh_pub_key = File.readlines('ssh/id_ed25519.pub').first.strip
       end
-      Dir.mkdir('ssh')
-      system('ssh-keygen -t ed25519 -f ssh/id_ed25519 -N ""')
-      insecure_ssh_pub_key = File.readlines('ssh/id_ed25519.pub').first.strip
     elsif operation == 'destroy'
       FileUtils.rm_rf('ssh')
     end
