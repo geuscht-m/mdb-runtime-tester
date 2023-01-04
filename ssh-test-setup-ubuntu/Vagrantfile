@@ -72,18 +72,11 @@ Vagrant.configure("2") do |config|
         end
       end
       if ARGV[0] == 'up'
-        #node.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-#{mongodb_version}.asc | sudo apt-key add -"
-        #node.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/#{mongodb_version} multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
         node.vm.provision "shell", inline: <<-SSHD_CONFIG
           sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
           systemctl restart sshd.service
         SSHD_CONFIG
       end
-      # if ARGV[0] == "up" || ARGV[0] == 'provision'
-      #   node.vm.provision "shell", inline: "sudo apt-get update && sudo apt-get upgrade -y"
-      #   node.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise linux-headers-generic"
-      # end
-      #node.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh/ ] || mkdir /home/vagrant/.ssh", privileged: false
       node.vm.provision "shell", inline: "echo #{insecure_ssh_pub_key} >> /home/vagrant/.ssh/authorized_keys", privileged: false
       # node.vm.provider "virtualbox" do |vb|
       #   vb.customize ["modifyvm", :id, "--cpus", "1", "--memory", "1024"]
@@ -101,25 +94,15 @@ Vagrant.configure("2") do |config|
     tester.vm.network :private_network, ip: "192.168.56.98"
     tester.vm.hostname = "testdriver.mongodb.test"
     if ARGV[0] == "up" || ARGV[0] == 'provision'
-      #tester.vm.provision "shell", inline: "[ -d /home/vagrant/tls ] || mkdir -p tls", privileged: false
       tester.vm.provision "file",  source: "tls/testdriver/testdriver.pem", destination: "tls/testdriver.pem"
-      #tester.vm.provision "file",  source: 'tls/CA/root.crt',    destination: 'tls/root.crt'
       tester.vm.provision 'file',  source: 'tls/user-cert/user-cert.pem',  destination: 'tls/user-cert.pem'
-      #tester.vm.provision "shell", inline: "[ -d /home/vagrant/.ssh ] || mkdir /home/vagrant/.ssh", privileged: false
       tester.vm.provision "file",  source: 'ssh/id_ed25519', destination: '.ssh/id_ed25519'
       tester.vm.provision "file",  source: 'ssh/id_ed25519.pub', destination: '.ssh/id_ed25519.pub'
       ['config-timeouts.js','setup-test-env.sh'].each do |filename|
         tester.vm.provision 'file',  source: filename, destination: filename
       end
-    end
-    # if ARGV[0] == 'up'
-    #   tester.vm.provision "shell", inline: "wget -qO - https://www.mongodb.org/static/pgp/server-#{mongodb_version}.asc | sudo apt-key add -"
-    #   tester.vm.provision "shell", inline: "echo \"deb [ arch=amd64,arm64,s390x ] http://repo.mongodb.com/apt/ubuntu bionic/mongodb-enterprise/#{mongodb_version} multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-enterprise.list"
-    # end
-    if ARGV[0] == "up" || ARGV[0] == 'provision'
-      # tester.vm.provision "shell", inline: "sudo apt-get update && sudo apt-get upgrade -y"
-      tester.vm.provision "shell", inline: "sudo apt-get install -y mongodb-enterprise linux-headers-generic emacs-nox tmux leiningen python3-pip"
-      tester.vm.provision "shell", inline: "sudo pip3 install mtools psutil pymongo"
+      tester.vm.provision "shell", inline: "sudo apt-get install -y vim-nox tmux leiningen python3-pip"
+      tester.vm.provision "shell", inline: "sudo pip3 install mtools psutil pymongo python-dateutil packaging"
     end
     #tester.vm.provision "hosts", :sync_hosts => true
     #tester.vm.synced_folder ".", "/vagrant", disabled: true
@@ -127,7 +110,7 @@ Vagrant.configure("2") do |config|
     tester.vm.synced_folder '../../clj-pem-decoder/', '/home/vagrant/git-repo/clj-pem-decoder'
     tester.vm.provider "virtualbox" do |vb|
       #vb.customize ["modifyvm", :id, "--cpus", "4", "--memory", "3072"]
-      vb.cpus = 2
+      #vb.cpus = 2
       vb.memory = 2048
     end
     tester.vm.provision 'shell', inline: '[ -d /home/vagrant/tmp/mdb-test ] || /home/vagrant/setup-test-env.sh', privileged: false
