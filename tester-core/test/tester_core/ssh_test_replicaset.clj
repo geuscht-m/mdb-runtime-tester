@@ -9,7 +9,7 @@
   (:require [clojure.test :refer :all]
             [tester-core.core :refer :all]
             [tester-core.test-helpers :refer :all]
-            [taoensso.timbre :as timbre :refer [debug error]]))
+            [taoensso.timbre :as timbre :refer [debug error trace]]))
 
 (defn- ssh-test-fixture
   [f]
@@ -50,8 +50,8 @@
   (testing "Check that we retrieve the correct primary and secondaries from the replset status"
     (let [primary      (get (get-rs-primary "mongodb://rs1.mongodb.test" :user "admin" :pwd "pw99") :name)
           secondaries  (sort (map #(get % :name) (get-rs-secondaries "mongodb://rs1.mongodb.test" :user "admin" :pwd "pw99")))]
-      ;;(println "Remote primary is " primary)
-      ;;(println "Remote secondaries are " secondaries)
+      (timbre/trace "Remote primary is " primary)
+      (timbre/trace "Remote secondaries are " secondaries)
       (is (not (nil? (re-matches #"rs[1-3].mongodb.test:27017" primary))))
       (is (not (some #{primary} secondaries)))
       (is (= (count secondaries) 2)))))
